@@ -140,12 +140,12 @@ public class GeometryDashApp implements IApp {
                     }
                 }
             } else if (o.type == ObstacleType.SPIKE) {
-                // Draw 1x1 cube spike(s) to match cube theme
+                // Draw stylized triangular spikes instead of squares
                 int cubes = Math.max(1, o.width / cubeSize);
                 for (int i = 0; i < cubes; i++) {
                     int sx = cx + o.x + i * cubeSize;
                     int sy = groundY - cubeSize;
-                    guiGraphics.fill(sx, sy, sx + cubeSize, sy + cubeSize, 0xFFFFA726);
+                    drawSpike(guiGraphics, sx, sy, cubeSize);
                 }
             } else if (o.type == ObstacleType.PAD) {
                 // pad as small glowing square
@@ -328,8 +328,8 @@ public class GeometryDashApp implements IApp {
             if (!horizOverlap) continue;
 
             if (o.type == ObstacleType.SPIKE) {
-                // spikes are 1x1 cubes; if player hits their area it's fatal
-                if (playerBottom < o.height + 2) { onPlayerDie(); return; }
+                // spikes are hazardous: treat like a sharp triangular hitbox approximated by its bounding box bottom area
+                if (playerBottom < o.height * 0.75f) { onPlayerDie(); return; }
             } else if (o.type == ObstacleType.PAD) {
                 // landing on pad (player bottom near pad height 0..padHeight)
                 if (playerBottom <= o.height + 2 && prevPlayerY > o.height + 2) {
@@ -472,6 +472,53 @@ public class GeometryDashApp implements IApp {
     }
 
     private void playSound(net.minecraft.sounds.SoundEvent sound) { Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(sound, 1.0F)); }
+
+    // --- New helper: draw a filled triangular spike with simple gradient + outline ---
+    private void drawSpike(GuiGraphics g, int x, int yTop, int size) {
+        int topColor = 0xFFFFE6B3;      // lighter tip
+        int midColor = 0xFFFFC066;      // mid tone
+        int baseColor = 0xFFFF8C1A;     // darker base
+        // build vertical gradient from top->base blending through mid
+        for (int row = 0; row < size; row++) {
+            float t = row / (float)(size - 1);
+            int col;
+            if (t < 0.5f) {
+                float lt = t / 0.5f; // 0..1 blend top->mid
+                col = lerpColor(topColor, midColor, lt);
+            } else {
+                float lt = (t - 0.5f) / 0.5f; // 0..1 blend mid->base
+                col = lerpColor(midColor, baseColor, lt);
+            }
+            // horizontal half-width shrinks linearly towards tip
+            float shrink = (row / (float)size); // 0 at tip, ~1 at base
+            int half = (int)Math.max(1, (size / 2f) * (1f - shrink));
+            int startX = x + size/2 - half;
+            int endX = x + size/2 + half;
+            g.fill(startX, yTop + row, endX, yTop + row + 1, col);
+        }
+        // outline left/right edges (darker) for a bit of definition
+        int outline = 0xFF5A2B00;
+        for (int row = 2; row < size; row++) {
+            float shrink = (row / (float)size);
+            int half = (int)Math.max(1, (size / 2f) * (1f - shrink));
+            int lx = x + size/2 - half;
+            int rx = x + size/2 + half - 1;
+            g.fill(lx, yTop + row, lx + 1, yTop + row + 1, outline);
+            g.fill(rx, yTop + row, rx + 1, yTop + row + 1, outline);
+        }
+    }
+
+    // simple ARGB color lerp (no gamma correction)
+    private int lerpColor(int c1, int c2, float t) {
+        t = Math.max(0f, Math.min(1f, t));
+        int a1 = (c1 >>> 24) & 0xFF, r1 = (c1 >>> 16) & 0xFF, g1 = (c1 >>> 8) & 0xFF, b1 = c1 & 0xFF;
+        int a2 = (c2 >>> 24) & 0xFF, r2 = (c2 >>> 16) & 0xFF, g2 = (c2 >>> 8) & 0xFF, b2 = c2 & 0xFF;
+        int a = a1 + Math.round((a2 - a1) * t);
+        int r = r1 + Math.round((r2 - r1) * t);
+        int g = g1 + Math.round((g2 - g1) * t);
+        int b = b1 + Math.round((b2 - b1) * t);
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
 
     @Override public void tick() {}
     @Override public void mouseReleased(DraggableWindow window, double mouseRelX, double mouseRelY, int button) {}
