@@ -61,9 +61,14 @@ public class GeometryDashApp implements IApp {
 
     // player texture (must include full path under textures/ and .png extension for direct blit)
     private static final ResourceLocation CUBE_TEXTURE = ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gd_cube_icons/cube.png");
+    // spike texture (user-provided 32x32)
+    private static final ResourceLocation SPIKE_TEXTURE = ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gd_elements/gd_spike.png");
 
     // track prior grounded state for landing snap
     private boolean wasGrounded = true;
+
+    // debug: show hitboxes toggle (F4)
+    private boolean showHitboxes = false;
 
     @Override
     public void onOpen(DraggableWindow window) {
@@ -140,12 +145,20 @@ public class GeometryDashApp implements IApp {
                     }
                 }
             } else if (o.type == ObstacleType.SPIKE) {
-                // Draw stylized triangular spikes instead of squares
+                // Draw spike using a texture (texture is 32x32) scaled to cubeSize so it matches other objects
                 int cubes = Math.max(1, o.width / cubeSize);
                 for (int i = 0; i < cubes; i++) {
                     int sx = cx + o.x + i * cubeSize;
                     int sy = groundY - cubeSize;
-                    drawSpike(guiGraphics, sx, sy, cubeSize);
+                    // use pose to scale the 32x32 texture down to cubeSize
+                    PoseStack ps2 = guiGraphics.pose();
+                    ps2.pushPose();
+                    float texHalf = 16f;
+                    float scaleSpike = cubeSize / 32f;
+                    ps2.translate(sx + cubeSize / 2.0f, sy + cubeSize / 2.0f, 0);
+                    ps2.scale(scaleSpike, scaleSpike, 1f);
+                    guiGraphics.blit(SPIKE_TEXTURE, (int)(-texHalf), (int)(-texHalf), 0, 0, 32, 32, 32, 32);
+                    ps2.popPose();
                 }
             } else if (o.type == ObstacleType.PAD) {
                 // pad as small glowing square
@@ -196,6 +209,38 @@ public class GeometryDashApp implements IApp {
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Score: " + score.get()), cx + 10, cy + 6, 0xFFFFFFFF, false);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Best: " + highScore.get()), cx + 110, cy + 6, 0xFFFFFF00, false);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Mode: " + currentMode + "  Speed: " + activeSpeedMultiplier + "x"), cx + 220, cy + 6, 0xFF88FF88, false);
+
+        // hitbox overlay when toggled
+        if (showHitboxes) {
+            // draw player box
+            int pLeft = cx + 60;
+            int pTop = Math.round(groundY - playerY - playerSize);
+            guiGraphics.fill(pLeft, pTop, pLeft + playerSize, pTop + playerSize, 0x8033AAFF);
+            // draw obstacle hitboxes
+            for (Obstacle o : obstacles) {
+                if (o.type == ObstacleType.BLOCK) {
+                    int bx = cx + o.x;
+                    int by = groundY - o.height;
+                    guiGraphics.fill(bx, by, bx + o.width, by + o.height, 0x8033FF33);
+                } else if (o.type == ObstacleType.SPIKE) {
+                    // small 2x2 hitbox centered in spike
+                    int small = 2;
+                    int centerX = cx + o.x + o.width/2;
+                    int centerY = groundY - (o.height/2);
+                    int hx = centerX - small/2;
+                    int hy = centerY - small/2;
+                    guiGraphics.fill(hx, hy, hx + small, hy + small, 0x80FF3333);
+                } else if (o.type == ObstacleType.PAD) {
+                    int px = cx + o.x;
+                    int py2 = groundY - o.height;
+                    guiGraphics.fill(px, py2, px + o.width, py2 + o.height, 0x80FFFF33);
+                } else if (o.type == ObstacleType.PORTAL) {
+                    int px = cx + o.x;
+                    int py2 = groundY - o.height;
+                    guiGraphics.fill(px, py2, px + cubeSize, py2 + cubeSize, 0x803388FF);
+                }
+            }
+        }
 
         if (state == GameState.MENU) {
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Geometry Dash — Click or press Space to jump"), cx + cw/2 - 120, cy + 30, 0xFFFFFFFF, false);
@@ -446,6 +491,7 @@ public class GeometryDashApp implements IApp {
         currentMode = "Cube"; activeSpeedMultiplier = 1;
         // reset rotation state
         cubeAngle = 0f; takeoffBaseAngle = 0f; airborneDistanceAccum = 0f; rotatingInAir = false; wasGrounded = true;
+        showHitboxes = false;
     }
 
     @Override
@@ -470,11 +516,17 @@ public class GeometryDashApp implements IApp {
 
     @Override
     public boolean keyPressed(DraggableWindow window, int keyCode, int scanCode, int modifiers) {
+        // Space
         if (keyCode == 32) {
             if (state == GameState.MENU) { state = GameState.PLAYING; gameStarted.set(true); }
             else if (state == GameState.GAME_OVER) { resetGame(); state = GameState.PLAYING; gameStarted.set(true); }
             else jumpRequested.set(true);
             lastUpdateTime.set(System.currentTimeMillis());
+            return true;
+        }
+        // F4 toggles hitbox overlay (GLFW F4 == 293)
+        if (keyCode == 293) {
+            showHitboxes = !showHitboxes;
             return true;
         }
         return false;
