@@ -328,8 +328,17 @@ public class GeometryDashApp implements IApp {
             if (!horizOverlap) continue;
 
             if (o.type == ObstacleType.SPIKE) {
-                // spikes are hazardous: treat like a sharp triangular hitbox approximated by its bounding box bottom area
-                if (playerBottom < o.height * 0.75f) { onPlayerDie(); return; }
+                // spikes are hazardous only in a very small centered 2x2 hitbox
+                float small = 2f; // 2x2 units
+                float hbLeft = o.x + (o.width / 2f) - (small / 2f);
+                float hbRight = hbLeft + small;
+                float hbTop = (o.height / 2f) - (small / 2f); // measured above ground
+                float hbBottom = hbTop + small;
+                // check full rectangle overlap between player and the small hitbox (not just player's bottom)
+                float playerTopF = playerBottom + playerSize;
+                boolean hxOverlap = (pRight > hbLeft && pLeft < hbRight);
+                boolean vyOverlap = (playerBottom < hbBottom && playerTopF > hbTop);
+                if (hxOverlap && vyOverlap) { onPlayerDie(); return; }
             } else if (o.type == ObstacleType.PAD) {
                 // landing on pad (player bottom near pad height 0..padHeight)
                 if (playerBottom <= o.height + 2 && prevPlayerY > o.height + 2) {
