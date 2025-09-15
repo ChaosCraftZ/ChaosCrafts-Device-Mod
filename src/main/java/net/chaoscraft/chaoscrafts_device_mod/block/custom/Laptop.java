@@ -1,0 +1,153 @@
+package net.chaoscraft.chaoscrafts_device_mod.block.custom;
+
+import net.chaoscraft.chaoscrafts_device_mod.block.ModBlocks;
+import net.chaoscraft.chaoscrafts_device_mod.block.entity.LaptopEntity;
+import net.chaoscraft.chaoscrafts_device_mod.client.screen.DesktopScreen;
+import net.chaoscraft.chaoscrafts_device_mod.sound.ModSounds;
+import net.chaoscraft.chaoscrafts_device_mod.util.LaptopHitboxHelper;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.item.context.BlockPlaceContext;
+
+public class Laptop extends BaseEntityBlock {
+    public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
+    public static final BooleanProperty OPEN = BlockStateProperties.OPEN;
+
+    public Laptop(Properties pProperties) {
+        super(pProperties);
+        this.registerDefaultState(this.stateDefinition.any()
+                .setValue(FACING, Direction.NORTH)
+                .setValue(OPEN, Boolean.valueOf(false)));
+    }
+
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<net.minecraft.world.level.block.Block, BlockState> builder) {
+        builder.add(FACING, OPEN);
+    }
+
+    @Override
+    public @Nullable BlockEntity newBlockEntity(BlockPos blockPos, BlockState blockState) {
+        return new LaptopEntity(blockPos, blockState);
+    }
+
+    @Override
+    public RenderShape getRenderShape(BlockState pState) {
+        return RenderShape.ENTITYBLOCK_ANIMATED;
+    }
+
+    @Override
+    public BlockState getStateForPlacement(BlockPlaceContext context) {
+        return this.defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+    }
+
+    @Override
+    public void setPlacedBy(Level pLevel, BlockPos pPos, BlockState pState, @Nullable LivingEntity pPlacer, ItemStack pStack) {
+        super.setPlacedBy(pLevel, pPos, pState, pPlacer, pStack);
+        if (!pLevel.isClientSide) {
+            BlockEntity be = pLevel.getBlockEntity(pPos);
+            if (be instanceof LaptopEntity laptop) {
+                laptop.setWhiteVariant(pState.getBlock() == ModBlocks.LAPTOP_WHITE.get());
+                laptop.setOpen(false, false);
+            }
+        }
+    }
+
+    @Override
+    public VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext ctx) {
+        if (!state.is(this)) {
+            return LaptopHitboxHelper.getShapeForState(false, Direction.NORTH);
+        }
+
+        Direction facing = state.getValue(FACING);
+        boolean isOpen = state.getValue(OPEN);
+
+        return LaptopHitboxHelper.getShapeForState(isOpen, facing);
+    }
+
+    @Override
+    public VoxelShape getCollisionShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext ctx) {
+        return getShape(state, world, pos, ctx);
+    }
+
+    // In your Laptop.java, modify the use method:
+    @Override
+    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
+        if (!state.is(this)) {
+            return InteractionResult.PASS;
+        }
+
+        BlockEntity be = level.getBlockEntity(pos);
+        if (!(be instanceof LaptopEntity laptop)) return InteractionResult.PASS;
+
+        // Convert hit to model-local coordinates
+        Vec3 hitVec = hit.getLocation().subtract(pos.getX(), pos.getY(), pos.getZ());
+        Direction facing = state.getValue(FACING);
+
+        // Determine if click is on screen
+        boolean onScreen = LaptopHitboxHelper.isPointOnScreen(hitVec, laptop.isOpen(), facing);
+
+        // Server-side handling
+        if (!level.isClientSide) {
+            // Handle texture switching (existing code)
+
+            // Handle open/close toggling
+            if (!player.isShiftKeyDown() || onScreen) {
+                if (onScreen && laptop.isOpen()) {
+                    // Screen click when open - pass through for UI
+                    return InteractionResult.PASS;
+                } else {
+                    // Toggle open/close state
+                    laptop.toggleOpen();
+                    BlockState newState = state.setValue(OPEN, laptop.isOpen());
+                    level.setBlock(pos, newState, 3);
+                    // Play open/close sound
+                    level.playSound(null, pos, laptop.isOpen() ? ModSounds.LAPTOP_OPEN.get() : ModSounds.LAPTOP_CLOSE.get(), SoundSource.BLOCKS, 0.6f, 1.0f + (level.random.nextFloat()-0.5f)*0.1f);
+                    return InteractionResult.sidedSuccess(level.isClientSide);
+                }
+            }
+        }
+
+        // Client-side handling
+        if (laptop.isOpen() && onScreen) {
+            try {
+                Minecraft.getInstance().setScreen(new DesktopScreen());
+            } catch (Exception ignored) {}
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
+
+        return InteractionResult.PASS;
+    }
+
+    @Override
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
+        if (!state.is(newState.getBlock())) {
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+            if (blockEntity instanceof LaptopEntity) {
+                level.removeBlockEntity(pos);
+            }
+        }
+    }
+}

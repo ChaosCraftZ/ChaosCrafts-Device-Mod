@@ -1,0 +1,113 @@
+{
+  "credit": "Made with Blockbench",
+  "texture_size": [
+    64,
+    64
+  ],
+  "display": {
+    "thirdperson_righthand": {
+      "translation": [
+        -6,
+        -0.75,
+        0
+      ]
+    },
+    "thirdperson_lefthand": {
+      "translation": [
+        -6,
+        0,
+        0
+      ]
+    },
+    "firstperson_righthand": {
+      "rotation": [
+        -180,
+        54.5,
+        -180
+      ],
+      "translation": [
+        0,
+        2,
+        0.25
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "firstperson_lefthand": {
+      "rotation": [
+        -180,
+        54.5,
+        -180
+      ],
+      "translation": [
+        0,
+        2,
+        0.25
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "ground": {
+      "translation": [
+        0,
+        0,
+        -0.75
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    "gui": {
+      "rotation": [
+        -151,
+        -39.5,
+        -180
+      ],
+      "translation": [
+        0.75,
+        -4.25,
+        0
+      ],
+      "scale": [
+        0.75,
+        0.75,
+        0.75
+      ]
+    },
+    "head": {
+      "translation": [
+        0,
+        6.25,
+        -0.75
+      ]
+    },
+    "fixed": {
+      "rotation": [
+        -36.25,
+        0,
+        0
+      ],
+      "translation": [
+        0,
+        -2.75,
+        -1.25
+      ],
+      "scale": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    }
+  },
+  "textures": {
+    "particle": "block/laptop_uv_black"
+  }
+}
