@@ -15,78 +15,109 @@ import java.lang.reflect.Type;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.ThreadLocalRandom;
 
+/**
+ * Cleaned up AppRegistry:
+ * - Centralized Gson instance and TypeToken constants.
+ * - Use ConcurrentHashMap and concurrent key sets.
+ * - Normalize internal names to lowercase (consistent and avoids duplicates).
+ * - Consolidated file IO save methods and removed duplicated logic.
+ * - Reduced noisy try/catch blocks (kept logging on failures).
+ * - Minor API-preserving behavior changes (keeps same public signatures).
+ */
 public class AppRegistry {
     private static final Logger LOGGER = LogManager.getLogger();
-    private static AppRegistry INSTANCE;
+    private static volatile AppRegistry INSTANCE;
+
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Type APP_MAP_TYPE = new TypeToken<Map<String, AppInfo>>() {}.getType();
+    private static final Type APP_STATUS_TYPE = new TypeToken<AppStatus>() {}.getType();
 
     private final File registryFile;
     private final File statusFile;
 
+    // thread-safe collections
     private final Map<String, AppInfo> allApps = new ConcurrentHashMap<>();
-    private final Set<String> installedApps = new CopyOnWriteArraySet<>();
-    private final Set<String> desktopApps = new CopyOnWriteArraySet<>();
-    private final Set<String> defaultApps = new CopyOnWriteArraySet<>();
+    private final Set<String> installedApps = ConcurrentHashMap.newKeySet();
+    private final Set<String> desktopApps = ConcurrentHashMap.newKeySet();
+
+    // default apps are constant and case-insensitive (internal names stored lowercase)
+    private static final Set<String> DEFAULT_APPS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+            "browser", "calculator", "paint", "files", "settings", "youtube", "notepad", "marketplace"
+    )));
 
     private final AsyncTaskManager asyncManager = AsyncTaskManager.getInstance();
-    // future that completes when the registry has finished loading
-    private final java.util.concurrent.CompletableFuture<Void> loadFuture;
+    private final CompletableFuture<Void> loadFuture;
 
     private AppRegistry() {
-        this.registryFile = new File(FilesManager.getPlayerDataDir(), "app_registry.json");
-        this.statusFile = new File(FilesManager.getPlayerDataDir(), "app_status.json");
+        File playerDir = FilesManager.getPlayerDataDir();
+        this.registryFile = new File(playerDir, "app_registry.json");
+        this.statusFile = new File(playerDir, "app_status.json");
 
-        // Default apps
-        Collections.addAll(defaultApps, "browser", "calculator", "paint", "files", "settings", "youtube", "notepad", "marketplace");
-
-        // Load on background thread and keep the future so callers can wait for completion
+        // Kick off background load and expose the future so others can wait
         this.loadFuture = asyncManager.submitIOTask(this::loadRegistry);
     }
 
-    // Allows callers to run logic when the registry has finished loading (may already be completed)
-    public java.util.concurrent.CompletableFuture<Void> getLoadedFuture() {
+    /**
+     * Returns a future that completes once the registry has finished loading.
+     */
+    public CompletableFuture<Void> getLoadedFuture() {
         return loadFuture;
     }
 
-    public static synchronized AppRegistry getInstance() {
-        if (INSTANCE == null) INSTANCE = new AppRegistry();
+    public static AppRegistry getInstance() {
+        if (INSTANCE == null) {
+            synchronized (AppRegistry.class) {
+                if (INSTANCE == null) INSTANCE = new AppRegistry();
+            }
+        }
         return INSTANCE;
     }
 
-    // Install with metadata; returns a CompletableFuture that completes when install finished
+    /**
+     * Install with metadata. Returns a future that completes when the install finishes.
+     */
     public CompletableFuture<Void> installApp(String appName, String displayName, String description, String version) {
+        Objects.requireNonNull(appName, "appName");
+        final String key = normalize(appName);
         return asyncManager.submitIOTask(() -> {
-            allApps.put(appName, new AppInfo(appName, displayName, description, version));
-            boolean added = installedApps.add(appName);
-            if (!added) {
-                saveRegistry();
-                return;
+            allApps.put(key, new AppInfo(key, displayName, description, version));
+            boolean added = installedApps.add(key);
+            if (added) {
+                desktopApps.add(key);
+                ensureFilesManagerIcon(key);
+                saveStatusAsync();
+                refreshDesktopIfOpen();
+                LOGGER.info("Installed app: {}", key);
+            } else {
+                // still persist metadata changes and registry
+                saveRegistryAsync();
             }
-            desktopApps.add(appName);
-            ensureFilesManagerIcon(appName);
-            saveRegistry();
-            saveInstallationStatus();
-            refreshDesktopIfOpen();
-            LOGGER.info("Installed app: {}", appName);
         });
     }
 
-    // Basic install used when only internal name is known
+    /**
+     * Basic install when only internal name is known.
+     */
     public CompletableFuture<Void> installApp(String appName) {
+        Objects.requireNonNull(appName, "appName");
+        final String key = normalize(appName);
         return asyncManager.submitIOTask(() -> {
-            boolean added = installedApps.add(appName);
-            if (!added) return;
-            desktopApps.add(appName);
-            ensureFilesManagerIcon(appName);
-            saveInstallationStatus();
-            refreshDesktopIfOpen();
-            LOGGER.info("Installed app (basic): {}", appName);
+            boolean added = installedApps.add(key);
+            if (added) {
+                desktopApps.add(key);
+                ensureFilesManagerIcon(key);
+                saveStatusAsync();
+                refreshDesktopIfOpen();
+                LOGGER.info("Installed app (basic): {}", key);
+            }
         });
     }
 
     public AppInfo getAppInfo(String appName) {
-        return allApps.get(appName);
+        if (appName == null) return null;
+        return allApps.get(normalize(appName));
     }
 
     public List<String> getInstalledAppNames() {
@@ -98,59 +129,58 @@ public class AppRegistry {
     }
 
     public boolean isDefaultApp(String appName) {
-        return defaultApps.contains(appName);
+        if (appName == null) return false;
+        return DEFAULT_APPS.contains(normalize(appName));
     }
 
     public boolean isInstalled(String appName) {
-        return installedApps.contains(appName);
+        if (appName == null) return false;
+        return installedApps.contains(normalize(appName));
     }
 
     public boolean isOnDesktop(String appName) {
-        return desktopApps.contains(appName);
+        if (appName == null) return false;
+        return desktopApps.contains(normalize(appName));
     }
 
     public void addToDesktop(String appName) {
+        Objects.requireNonNull(appName, "appName");
+        final String key = normalize(appName);
         asyncManager.submitIOTask(() -> {
-            boolean added = desktopApps.add(appName);
+            boolean added = desktopApps.add(key);
             if (!added) {
-                LOGGER.info("addToDesktop: already present {}", appName);
+                LOGGER.debug("addToDesktop: already present {}", key);
                 return;
             }
-            ensureFilesManagerIcon(appName);
-            saveInstallationStatus();
+            ensureFilesManagerIcon(key);
+            saveStatusAsync();
             refreshDesktopIfOpen();
-            LOGGER.info("Added to desktop: {}", appName);
+            LOGGER.info("Added to desktop: {}", key);
         });
     }
 
     public void removeFromDesktop(String appName) {
+        Objects.requireNonNull(appName, "appName");
+        final String key = normalize(appName);
         asyncManager.submitIOTask(() -> {
-            desktopApps.remove(appName);
-            try {
-                FilesManager fm = FilesManager.getInstance();
-                if (fm != null && fm.hasDesktopIcon(appName)) fm.removeDesktopIcon(appName);
-            } catch (Exception e) {
-                LOGGER.debug("FilesManager removeDesktopIcon failed", e);
-            }
-            saveInstallationStatus();
+            desktopApps.remove(key);
+            removeDesktopIconIfExists(key);
+            saveStatusAsync();
             refreshDesktopIfOpen();
-            LOGGER.info("Removed from desktop: {}", appName);
+            LOGGER.info("Removed from desktop: {}", key);
         });
     }
 
     public void uninstallApp(String appName) {
+        Objects.requireNonNull(appName, "appName");
+        final String key = normalize(appName);
         asyncManager.submitIOTask(() -> {
-            installedApps.remove(appName);
-            desktopApps.remove(appName);
-            try {
-                FilesManager fm = FilesManager.getInstance();
-                if (fm != null && fm.hasDesktopIcon(appName)) fm.removeDesktopIcon(appName);
-            } catch (Exception e) {
-                LOGGER.debug("FilesManager removeDesktopIcon failed", e);
-            }
-            saveInstallationStatus();
+            installedApps.remove(key);
+            desktopApps.remove(key);
+            removeDesktopIconIfExists(key);
+            saveStatusAsync();
             refreshDesktopIfOpen();
-            LOGGER.info("Uninstalled app: {}", appName);
+            LOGGER.info("Uninstalled app: {}", key);
         });
     }
 
@@ -158,64 +188,68 @@ public class AppRegistry {
         return new HashSet<>(desktopApps);
     }
 
+    /* -------------------- Internal helpers -------------------- */
+
     private void loadRegistry() {
         try {
+            // Load registry file
             if (registryFile.exists()) {
                 try (FileReader reader = new FileReader(registryFile)) {
-                    Gson gson = new Gson();
-                    Type type = new TypeToken<Map<String, AppInfo>>(){}.getType();
-                    Map<String, AppInfo> loaded = gson.fromJson(reader, type);
-                    if (loaded != null) allApps.putAll(loaded);
+                    Map<String, AppInfo> loaded = GSON.fromJson(reader, APP_MAP_TYPE);
+                    if (loaded != null) {
+                        // normalize keys to lowercase to avoid duplicates
+                        for (Map.Entry<String, AppInfo> e : loaded.entrySet()) {
+                            String key = normalize(e.getKey());
+                            AppInfo info = e.getValue();
+                            if (info != null) {
+                                // ensure internalName stored normalized
+                                info.internalName = key;
+                                allApps.put(key, info);
+                            }
+                        }
+                    }
                 }
             }
 
+            // Load installation status (installed / desktop)
             loadInstallationStatus();
 
-            // Remove legacy apps
-            // NOTE: Removed removal of notes/calendar/weather so they can appear in the marketplace
-//            List<String> legacy = Arrays.asList("notes", "calendar", "weather");
-//            for (String l : legacy) {
-//                allApps.remove(l);
-//                installedApps.remove(l);
-//                desktopApps.remove(l);
-//                try { FilesManager fm = FilesManager.getInstance(); if (fm != null && fm.hasDesktopIcon(l)) fm.removeDesktopIcon(l); } catch (Exception ignored) {}
-//            }
-
-            // Ensure defaults
-            for (String d : defaultApps) {
-                if (!allApps.containsKey(d)) {
-                    String display = d.substring(0,1).toUpperCase() + d.substring(1);
-                    allApps.put(d, new AppInfo(d, display, "Default application", "1.0"));
-                }
+            // Ensure default apps exist and are marked installed + on desktop
+            for (String d : DEFAULT_APPS) {
+                allApps.computeIfAbsent(d, k -> {
+                    String display = capitalizeEachWord(k);
+                    return new AppInfo(k, display, "Default application", "1.0");
+                });
                 installedApps.add(d);
                 desktopApps.add(d);
             }
 
-            // Marketplace entries (space-separated internal names)
-            Map<String,String> nonDefault = new LinkedHashMap<>();
-            nonDefault.put("geometry dash","A fun rhythm-based platformer");
-            nonDefault.put("home security","Monitor your home security system");
-            nonDefault.put("audio player","Play your favorite music files");
-            nonDefault.put("video player","Watch video files");
-            // Add Notes, Calendar and Weather to marketplace entries
-            nonDefault.put("notes", "A simple note taking application");
-            nonDefault.put("calendar", "Manage your events and schedule");
-            nonDefault.put("weather", "Check the current weather and forecast");
+            // Marketplace / extra entries
+            Map<String, String> marketplace = new LinkedHashMap<>();
+            marketplace.put("geometry dash", "A fun rhythm-based platformer");
+            marketplace.put("home security", "Monitor your home security system");
+            marketplace.put("audio player", "Play your favorite music files");
+            marketplace.put("video player", "Watch video files");
+            marketplace.put("notes", "A simple note taking application");
+            marketplace.put("calendar", "Manage your events and schedule");
+            marketplace.put("weather", "Check the current weather and forecast");
 
-            for (Map.Entry<String,String> e : nonDefault.entrySet()) {
-                String internal = e.getKey();
-                if (!allApps.containsKey(internal)) {
-                    String display = Arrays.stream(internal.split(" "))
-                            .map(s -> s.substring(0,1).toUpperCase() + s.substring(1))
-                            .reduce((a,b)->a+" "+b).orElse(internal);
-                    allApps.put(internal, new AppInfo(internal, display, e.getValue(), "1.0"));
-                }
+            for (Map.Entry<String, String> e : marketplace.entrySet()) {
+                String internal = normalize(e.getKey());
+                allApps.computeIfAbsent(internal, k -> {
+                    return new AppInfo(k, capitalizeEachWord(k), e.getValue(), "1.0");
+                });
             }
 
-            saveRegistry();
-            saveInstallationStatus();
+            // Persist any changes discovered during load
+            saveRegistryAsync();
+            saveStatusAsync();
 
-            try { FilesManager.getInstance().updateDesktopIconsFromRegistry(); } catch (Exception ignored) {}
+            // Try to synchronize desktop icons with FilesManager
+            try {
+                FilesManager.getInstance().updateDesktopIconsFromRegistry();
+            } catch (Exception ignored) {
+            }
         } catch (Exception e) {
             LOGGER.error("Failed to load app registry", e);
         }
@@ -224,37 +258,37 @@ public class AppRegistry {
     private void loadInstallationStatus() {
         if (!statusFile.exists()) return;
         try (FileReader reader = new FileReader(statusFile)) {
-            Gson gson = new Gson();
-            Type type = new TypeToken<AppStatus>(){}.getType();
-            AppStatus status = gson.fromJson(reader, type);
+            AppStatus status = GSON.fromJson(reader, APP_STATUS_TYPE);
             if (status != null) {
                 installedApps.clear();
-                if (status.installedApps != null) installedApps.addAll(status.installedApps);
+                if (status.installedApps != null) {
+                    for (String s : status.installedApps) installedApps.add(normalize(s));
+                }
                 desktopApps.clear();
-                if (status.desktopApps != null) desktopApps.addAll(status.desktopApps);
+                if (status.desktopApps != null) {
+                    for (String s : status.desktopApps) desktopApps.add(normalize(s));
+                }
             }
         } catch (Exception e) {
             LOGGER.error("Failed to load installation status", e);
         }
     }
 
-    private void saveInstallationStatus() {
+    private void saveStatusAsync() {
         asyncManager.submitIOTask(() -> {
             try (FileWriter writer = new FileWriter(statusFile)) {
-                Gson gson = new GsonBuilder().setPrettyPrinting().create();
-                AppStatus status = new AppStatus(installedApps, desktopApps);
-                gson.toJson(status, writer);
+                AppStatus status = new AppStatus(new HashSet<>(installedApps), new HashSet<>(desktopApps));
+                GSON.toJson(status, writer);
             } catch (Exception e) {
                 LOGGER.error("Failed to save installation status", e);
             }
         });
     }
 
-    private void saveRegistry() {
+    private void saveRegistryAsync() {
         asyncManager.submitIOTask(() -> {
             try (FileWriter writer = new FileWriter(registryFile)) {
-                Gson gson = new GsonBuilder().setPrettyPrinting().create();
-                gson.toJson(allApps, writer);
+                GSON.toJson(allApps, writer);
             } catch (Exception e) {
                 LOGGER.error("Failed to save app registry", e);
             }
@@ -264,13 +298,25 @@ public class AppRegistry {
     private void ensureFilesManagerIcon(String appName) {
         try {
             FilesManager fm = FilesManager.getInstance();
-            if (fm != null && !fm.hasDesktopIcon(appName)) {
-                int x = 150 + (int) (Math.random() * 300);
-                int y = 60 + (int) (Math.random() * 200);
+            if (fm == null) return;
+            if (!fm.hasDesktopIcon(appName)) {
+                int x = 150 + ThreadLocalRandom.current().nextInt(0, 301); // [150,450)
+                int y = 60 + ThreadLocalRandom.current().nextInt(0, 201);  // [60,260)
                 fm.addDesktopIcon(appName, x, y);
             }
         } catch (Exception e) {
             LOGGER.debug("ensureFilesManagerIcon failed for {}", appName, e);
+        }
+    }
+
+    private void removeDesktopIconIfExists(String appName) {
+        try {
+            FilesManager fm = FilesManager.getInstance();
+            if (fm != null && fm.hasDesktopIcon(appName)) {
+                fm.removeDesktopIcon(appName);
+            }
+        } catch (Exception e) {
+            LOGGER.debug("FilesManager removeDesktopIcon failed for {}", appName, e);
         }
     }
 
@@ -281,9 +327,27 @@ public class AppRegistry {
                     if (net.minecraft.client.Minecraft.getInstance().screen instanceof net.chaoscraft.chaoscrafts_device_mod.client.screen.DesktopScreen) {
                         ((net.chaoscraft.chaoscrafts_device_mod.client.screen.DesktopScreen) net.minecraft.client.Minecraft.getInstance().screen).refreshDesktopIcons();
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             });
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
+    }
+
+    private static String capitalizeEachWord(String s) {
+        String[] parts = s.split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < parts.length; i++) {
+            String p = parts[i];
+            if (p.isEmpty()) continue;
+            sb.append(Character.toUpperCase(p.charAt(0))).append(p.substring(1));
+            if (i < parts.length - 1) sb.append(' ');
+        }
+        return sb.toString();
+    }
+
+    private static String normalize(String s) {
+        return s == null ? null : s.toLowerCase(Locale.ROOT).trim();
     }
 
     public static class AppInfo {
@@ -291,6 +355,9 @@ public class AppRegistry {
         public String displayName;
         public String description;
         public String version;
+
+        // Default constructor for Gson
+        public AppInfo() {}
 
         public AppInfo(String internalName, String displayName, String description, String version) {
             this.internalName = internalName;
@@ -303,6 +370,9 @@ public class AppRegistry {
     private static class AppStatus {
         Set<String> installedApps;
         Set<String> desktopApps;
+
+        // Default constructor for Gson
+        public AppStatus() {}
 
         public AppStatus(Set<String> installedApps, Set<String> desktopApps) {
             this.installedApps = installedApps;
