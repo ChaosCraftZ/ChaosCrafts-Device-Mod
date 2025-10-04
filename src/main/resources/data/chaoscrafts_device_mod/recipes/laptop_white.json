@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "III",
+    "RGR",
+    " B "
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "R": { "item": "minecraft:redstone" },
+    "G": { "item": "minecraft:glass_pane" },
+    "B": { "item": "minecraft:white_dye" }
+  },
+  "result": {
+    "item": "chaoscrafts_device_mod:laptop_white",
+    "count": 1
+  }
+}
+
