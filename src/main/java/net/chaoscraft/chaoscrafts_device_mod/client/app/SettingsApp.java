@@ -100,7 +100,16 @@ public class SettingsApp implements IApp {
     public static void loadSettings() { loadSettingsAsync(); }
 
     private static void applyLoadedSettings() {
-        if (SETTINGS.containsKey("darkTheme") && SETTINGS.get("darkTheme") instanceof Boolean) DraggableWindow.darkTheme = (Boolean) SETTINGS.get("darkTheme");
+        // If the file explicitly contains a boolean for darkTheme, honor it.
+        if (SETTINGS.containsKey("darkTheme") && SETTINGS.get("darkTheme") instanceof Boolean) {
+            DraggableWindow.darkTheme = (Boolean) SETTINGS.get("darkTheme");
+        } else {
+            // No explicit setting found in loaded settings -> enable dark theme by default and persist that choice
+            DraggableWindow.darkTheme = true;
+            SETTINGS.put("darkTheme", true);
+            saveSettingsAsync();
+        }
+
         if (SETTINGS.containsKey("accentColor") && SETTINGS.get("accentColor") instanceof String) {
             try { DraggableWindow.accentColorARGB = 0xFF000000 | Integer.parseInt(((String)SETTINGS.get("accentColor")).replace("#",""), 16); } catch (Exception ignored) {}
         }

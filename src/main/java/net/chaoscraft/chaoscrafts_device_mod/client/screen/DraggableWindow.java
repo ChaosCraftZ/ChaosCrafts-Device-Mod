@@ -35,7 +35,8 @@ public class DraggableWindow {
     private int dragOffsetX, dragOffsetY;
 
     // Global theme & accent (SettingsApp toggles)
-    public static boolean darkTheme = false;
+    // Default to dark theme enabled
+    public static boolean darkTheme = true;
     public static int accentColorARGB = 0xFF4C7BD1;
 
     // Track all open windows so callers can close them en-masse
