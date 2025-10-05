@@ -209,7 +209,7 @@ public class SettingsApp implements IApp {
 
         // Sidebar for categories
         int sidebarW = 140;
-        guiGraphics.fill(cx, cy, cx + sidebarW, cy + 220, DraggableWindow.darkTheme ? 0xFF1A1A1A : 0xFFEFEFEF);
+        guiGraphics.fill(cx, cy, cx + sidebarW, cy + 220, DraggableWindow.darkTheme ? 0xFF1A1A1A : 0xFFCCCCCC);
         for (int i = 0; i < categories.length; i++) {
             int itemY = cy + 8 + i * 34;
             int textColor = (i == selectedCategoryIndex) ? DraggableWindow.accentColorARGB : DraggableWindow.textSecondaryColor();
