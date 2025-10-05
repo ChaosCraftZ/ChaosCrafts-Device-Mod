@@ -2,18 +2,15 @@ package net.chaoscraft.chaoscrafts_device_mod;
 
 import com.mojang.logging.LogUtils;
 import net.chaoscraft.chaoscrafts_device_mod.block.ModBlocks;
-import net.chaoscraft.chaoscrafts_device_mod.block.entity.LaptopEntity;
 import net.chaoscraft.chaoscrafts_device_mod.block.entity.ModBlockEntities;
 import net.chaoscraft.chaoscrafts_device_mod.item.ModCreativeModTabs;
 import net.chaoscraft.chaoscrafts_device_mod.item.ModItems;
 import net.chaoscraft.chaoscrafts_device_mod.sound.ModSounds;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
-import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -34,6 +31,7 @@ import software.bernie.geckolib.GeckoLib;
 
 // The value here should match an entry in the META-INF/mods.toml file
 @Mod(CDM.MOD_ID)
+@SuppressWarnings("removal")
 public class CDM {
     // Define mod id in a common place for everything to reference
     public static final String MOD_ID = "chaoscrafts_device_mod";
@@ -110,9 +108,7 @@ public class CDM {
 
             // Register shutdown hook
             try {
-                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                    AsyncTaskManager.getInstance().shutdown();
-                }));
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> AsyncTaskManager.getInstance().shutdown()));
             } catch (Exception ignored) {}
 
             // Register example add-on apps and icons on client setup so other developers can see how to register
