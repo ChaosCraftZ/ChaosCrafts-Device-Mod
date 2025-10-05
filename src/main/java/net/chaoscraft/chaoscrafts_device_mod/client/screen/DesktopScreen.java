@@ -410,7 +410,7 @@ public class DesktopScreen extends Screen {
                     int iconSizePx = 20;
                     int iconX = popupX + 10;
                     if (r.iconRes != null) {
-                        try { guiGraphics.blit(r.iconRes, iconX, ry + (RESULT_HEIGHT - iconSizePx) / 2, 0, 0, iconSizePx, iconSizePx, iconSizePx, iconSizePx); } catch (Exception ignored) {}
+                        try { guiGraphics.blit(r.iconRes, iconX, ry + (RESULT_HEIGHT - iconSizePx) / 2, 0, 0, iconSizePx, iconSizePx); } catch (Exception ignored) {}
                     }
                     String label = r.displayName;
                     int textX = popupX + 12 + iconSizePx + 6;
@@ -831,21 +831,32 @@ public class DesktopScreen extends Screen {
     private static class SearchResult { final String displayName; final ResourceLocation iconRes; final Runnable action; SearchResult(String d, ResourceLocation i, Runnable a){displayName=d;iconRes=i;action=a;} }
 
     private static class DesktopIcon {
-        final String name; int targetX, targetY; float displayX, displayY; final Runnable onClick; int iconSize = 32;
-        DesktopIcon(String name, int x, int y, Runnable onClick) { this.name = name; this.targetX = (x / ICON_GRID) * ICON_GRID; this.targetY = (y / ICON_GRID) * ICON_GRID; this.displayX = this.targetX; this.displayY = this.targetY; this.onClick = onClick; }
-        void render(GuiGraphics g, int mouseX, int mouseY, boolean selected, int currentIconSize) {
-            this.iconSize = currentIconSize; int dx = Math.round(displayX), dy = Math.round(displayY);
-            boolean hover = mouseX >= dx && mouseX <= dx + iconSize && mouseY >= dy && mouseY <= dy + iconSize;
-            if (selected) g.fill(dx - 6, dy - 6, dx + iconSize + 6, dy + iconSize + 14, 0x2233AAFF);
-            g.fill(dx - 1, dy + iconSize + 1, dx + iconSize, dy + iconSize + 3, 0xAA000000);
-            String key = name.contains(".") ? null : normalizeAppNameForIcon(name);
-            ResourceLocation iconRes = IconManager.getIconResource(key);
-            try { g.blit(iconRes, dx + 2, dy + 2, 0, 0, iconSize - 4, iconSize - 4, iconSize - 4, iconSize - 4); } catch (Exception ignored) {}
-            if (hover) g.fill(dx - 2, dy - 2, dx + iconSize + 2, dy + iconSize + 2, DraggableWindow.selectionOverlayColor());
-            String displayName = toTitleCase(name);
-            if (Minecraft.getInstance().font.width(displayName) > iconSize + 10) displayName = Minecraft.getInstance().font.plainSubstrByWidth(displayName, iconSize + 5) + "...";
-            g.drawString(Minecraft.getInstance().font, Component.literal(displayName), dx, dy + iconSize + 4, DraggableWindow.textPrimaryColor(), false);
+            final String name; int targetX, targetY; float displayX, displayY; final Runnable onClick; int iconSize = 32;
+            DesktopIcon(String name, int x, int y, Runnable onClick) { this.name = name; this.targetX = (x / ICON_GRID) * ICON_GRID; this.targetY = (y / ICON_GRID) * ICON_GRID; this.displayX = this.targetX; this.displayY = this.targetY; this.onClick = onClick; }
+            void render(GuiGraphics g, int mouseX, int mouseY, boolean selected, int currentIconSize) {
+                this.iconSize = currentIconSize; int dx = Math.round(displayX), dy = Math.round(displayY);
+                boolean hover = mouseX >= dx && mouseX <= dx + iconSize && mouseY >= dy && mouseY <= dy + iconSize;
+                if (selected) g.fill(dx - 6, dy - 6, dx + iconSize + 6, dy + iconSize + 14, 0x2233AAFF);
+                g.fill(dx - 1, dy + iconSize + 1, dx + iconSize, dy + iconSize + 3, 0xAA000000);
+                String key = name.contains(".") ? null : normalizeAppNameForIcon(name);
+                ResourceLocation iconRes = IconManager.getIconResource(key);
+                try { g.blit(iconRes, dx + 2, dy + 2, 0, 0, iconSize - 4, iconSize - 4, iconSize - 4, iconSize - 4); } catch (Exception ignored) {}
+                if (hover) g.fill(dx - 2, dy - 2, dx + iconSize + 2, dy + iconSize + 2, DraggableWindow.selectionOverlayColor());
+                String displayName = toTitleCase(name);
+                if (Minecraft.getInstance().font.width(displayName) > iconSize + 10) displayName = Minecraft.getInstance().font.plainSubstrByWidth(displayName, iconSize + 5) + "...";
+                // Draw a subtle dark outline/shadow around the label (multi-offset) to ensure legibility on any wallpaper
+                int textX = dx;
+                int textY = dy + iconSize + 4;
+                int shadowColor = DraggableWindow.darkTheme ? 0x55000000 : 0xAA000000; // lighter shadow in dark theme
+                var font = Minecraft.getInstance().font;
+                // four-offset outline
+                g.drawString(font, Component.literal(displayName), textX + 1, textY + 1, shadowColor, false);
+                g.drawString(font, Component.literal(displayName), textX - 1, textY + 1, shadowColor, false);
+                g.drawString(font, Component.literal(displayName), textX + 1, textY - 1, shadowColor, false);
+                g.drawString(font, Component.literal(displayName), textX - 1, textY - 1, shadowColor, false);
+                // main label
+                g.drawString(font, Component.literal(displayName), textX, textY, DraggableWindow.textPrimaryColor(), false);
+            }
+            boolean isInside(double mouseX, double mouseY, int currentIconSize) { return mouseX >= displayX && mouseX <= displayX + currentIconSize && mouseY >= displayY && mouseY <= displayY + currentIconSize; }
         }
-        boolean isInside(double mouseX, double mouseY, int currentIconSize) { return mouseX >= displayX && mouseX <= displayX + currentIconSize && mouseY >= displayY && mouseY <= displayY + currentIconSize; }
-    }
 }
