@@ -69,6 +69,8 @@ public class DesktopScreen extends Screen {
     private boolean showDebugInfo = false;
     private final AsyncTaskManager asyncManager = AsyncTaskManager.getInstance();
     private final java.util.Random rng = new java.util.Random();
+    // one-time logging to help diagnose missing icon resources
+    private static final java.util.Set<String> missingIconLog = new java.util.HashSet<>();
 
     // Key binding state
     private boolean ctrlPressed = false;
@@ -372,14 +374,14 @@ public class DesktopScreen extends Screen {
             int iconY = tbY + (taskbarHeight - trayIconH) / 2;
 
             for (String lbl : trayLabels) {
-                guiGraphics.fill(x, iconY, x + trayIconW, iconY + trayIconH, 0x20000000);
-                guiGraphics.fill(x + 1, iconY + 1, x + trayIconW - 1, iconY + trayIconH - 1, 0x33000000);
-                int lw = font.width(lbl);
-                int lx = x + Math.max(4, (trayIconW - lw) / 2);
-                int ly = iconY + Math.max(1, (trayIconH - 8) / 2);
-                guiGraphics.drawString(font, Component.literal(lbl), lx, ly, DraggableWindow.textPrimaryColor(), false);
-                x += trayIconW + trayIconPad;
-            }
+                 guiGraphics.fill(x, iconY, x + trayIconW, iconY + trayIconH, 0x20000000);
+                 guiGraphics.fill(x + 1, iconY + 1, x + trayIconW - 1, iconY + trayIconH - 1, 0x33000000);
+                 int lw = font.width(lbl);
+                 int lx = x + Math.max(4, (trayIconW - lw) / 2);
+                 int ly = iconY + Math.max(1, (trayIconH - 8) / 2);
+                 drawShadowedString(guiGraphics, font, lbl, lx, ly);
+                 x += trayIconW + trayIconPad;
+             }
 
             int clockRightEdge = width - trayRightPadding;
             int clockLeft = clockRightEdge - Math.max(timeW, dateW);
@@ -387,8 +389,8 @@ public class DesktopScreen extends Screen {
             if (clockLeft < minClockLeft) clockLeft = minClockLeft;
             int timeY = tbY + Math.max(2, (taskbarHeight - (font.lineHeight * 2)) / 2);
             int dateY = timeY + Math.max(6, font.lineHeight - 2);
-            guiGraphics.drawString(font, Component.literal(timeStr), clockLeft, timeY, DraggableWindow.textPrimaryColor(), false);
-            guiGraphics.drawString(font, Component.literal(dateStr), clockLeft, dateY, DraggableWindow.textSecondaryColor(), false);
+            drawShadowedString(guiGraphics, font, timeStr, clockLeft, timeY);
+            drawShadowedString(guiGraphics, font, dateStr, clockLeft, dateY);
 
             // render the search box on top so it is visible and receives input reliably
             try { searchBox.render(guiGraphics, mouseX, mouseY, partialTick); } catch (Exception ignored) {}
@@ -412,16 +414,25 @@ public class DesktopScreen extends Screen {
                     if (hovered) guiGraphics.fill(popupX + 6, ry, popupX + 6 + rw, ry + RESULT_HEIGHT, DraggableWindow.selectionOverlayColor());
                     int iconSizePx = 20;
                     int iconX = popupX + 10;
-                    if (r.iconRes != null) {
-                        try { guiGraphics.blit(r.iconRes, iconX, ry + (RESULT_HEIGHT - iconSizePx) / 2, 0, 0, iconSizePx, iconSizePx); } catch (Exception ignored) {}
+                    // Try to resolve an icon for the result. If r.iconRes is null, attempt to derive from the display name.
+                    ResourceLocation iconToUse = r.iconRes;
+                    if (iconToUse == null) {
+                        try {
+                            String derived = normalizeAppNameForIcon(r.displayName);
+                            if (derived != null && !derived.isEmpty()) iconToUse = IconManager.getIconResource(derived);
+                        } catch (Exception ignored) { iconToUse = null; }
+                    }
+                    if (iconToUse != null) {
+                        try { guiGraphics.blit(iconToUse, iconX, ry + (RESULT_HEIGHT - iconSizePx) / 2, 0, 0, iconSizePx, iconSizePx); } catch (Exception ignored) {}
                     }
                     String label = r.displayName;
                     int textX = popupX + 12 + iconSizePx + 6;
                     int availTextW = popupW - (textX - popupX) - 12;
                     if (font.width(label) > availTextW) label = font.plainSubstrByWidth(label, availTextW - 8) + "...";
-                    guiGraphics.drawString(font, Component.literal(label), textX, ry + 6, DraggableWindow.textPrimaryColor(), false);
-                }
-            }
+                    // draw label white with dark shadow so it stays legible on any theme
+                    drawShadowedString(guiGraphics, font, label, textX, ry + 6);
+                 }
+             }
 
             // draw open-window taskbar icons starting after the search box and before trayLeft
             int perEntry = 52;
@@ -462,7 +473,8 @@ public class DesktopScreen extends Screen {
                     int nx = Math.max(6, Math.min(width - nw - 6, cx - nw / 2));
                     int ny = tbY - 22;
                     guiGraphics.fill(nx, ny, nx + nw, ny + 16, DraggableWindow.darkTheme ? 0xEE222222 : 0xEEFFFFFF);
-                    guiGraphics.drawString(font, Component.literal(name), nx + 4, ny + 3, DraggableWindow.textPrimaryColor(), false);
+                    // draw tooltip label using the white+shadow helper only
+                    drawShadowedString(guiGraphics, font, name, nx + 4, ny + 3);
                 }
 
                 tx += perEntry;
@@ -510,37 +522,75 @@ public class DesktopScreen extends Screen {
     }
 
     private void updateSearchResults() {
-        searchResults.clear(); String q = searchBox.getValue().trim().toLowerCase(); if (q.isEmpty()) return;
+        searchResults.clear();
+        String q = searchBox.getValue().trim().toLowerCase();
+        if (q.isEmpty()) return;
         // Desktop icons
         for (DesktopIcon di : desktopIcons) {
             if (di.name.toLowerCase().contains(q)) {
-                String key = di.name.contains(".") ? null : normalizeAppNameForIcon(di.name);
-                ResourceLocation icon = IconManager.getIconResource(key);
-                searchResults.add(new SearchResult(toTitleCase(di.name), icon, di.onClick));
+                String display = toTitleCase(di.name);
+                ResourceLocation icon = null;
+                try {
+                    // Try normalized id (most common)
+                    String candidate = normalizeAppNameForIcon(di.name.replaceAll("\\.\\w+$", ""));
+                    if (candidate != null && !candidate.isEmpty()) icon = IconManager.getIconResource(candidate);
+                } catch (Exception ignored) {
+                    icon = null;
+                }
+                // fallback: try simple lowercase full name
+                if (icon == null) {
+                    try {
+                        icon = IconManager.getIconResource(di.name.toLowerCase());
+                    } catch (Exception ignored) {
+                        icon = null;
+                    }
+                }
+                searchResults.add(new SearchResult(display, icon, di.onClick));
+                if (icon == null) {
+                    String keyLog = di.name == null ? "<null>" : di.name;
+                    if (!missingIconLog.contains(keyLog)) {
+                        missingIconLog.add(keyLog);
+                        System.out.println("[DesktopScreen] Missing icon for desktop entry: " + keyLog);
+                    }
+                }
             }
         }
-        // Open windows / apps
+
+        // Open windows / apps (handled once, not per-desktop-icon)
         for (DraggableWindow w : openApps) {
             String appNameForMatch = w.appName == null ? "" : w.appName;
             if (appNameForMatch.toLowerCase().contains(q)) {
-                String normalized = normalizeAppNameForIcon(appNameForMatch);
-                ResourceLocation icon = IconManager.getIconResource(normalized);
+                ResourceLocation icon = null;
+                try {
+                    String normalized = normalizeAppNameForIcon(appNameForMatch);
+                    if (normalized != null && !normalized.isEmpty()) icon = IconManager.getIconResource(normalized);
+                } catch (Exception ignored) {
+                    icon = null;
+                }
+                if (icon == null) {
+                    try { icon = IconManager.getIconResource(appNameForMatch.toLowerCase()); } catch (Exception ignored) { icon = null; }
+                }
                 searchResults.add(new SearchResult(appNameForMatch, icon, () -> bringToFront(w)));
+                if (icon == null) {
+                    String keyLog = appNameForMatch == null ? "<null>" : appNameForMatch;
+                    if (!missingIconLog.contains(keyLog)) { missingIconLog.add(keyLog); System.out.println("[DesktopScreen] Missing icon for app/search entry: " + keyLog); }
+                }
             }
         }
+
     }
 
     private static float lerp(float a, float b, float f) { return a + (b - a) * f; }
 
     // Draw text with a dark shadow outline (always white main text)
     private static void drawShadowedString(GuiGraphics g, net.minecraft.client.gui.Font font, String text, int x, int y) {
-        int shadow = 0x66000000; // dark shadow
-        g.drawString(font, Component.literal(text), x + 1, y + 1, shadow, false);
-        g.drawString(font, Component.literal(text), x - 1, y + 1, shadow, false);
-        g.drawString(font, Component.literal(text), x + 1, y - 1, shadow, false);
-        g.drawString(font, Component.literal(text), x - 1, y - 1, shadow, false);
-        g.drawString(font, Component.literal(text), x, y, 0xFFFFFFFF, false);
-    }
+             int shadow = 0x66000000; // dark shadow
+             g.drawString(font, Component.literal(text), x + 1, y + 1, shadow, false);
+             g.drawString(font, Component.literal(text), x - 1, y + 1, shadow, false);
+             g.drawString(font, Component.literal(text), x + 1, y - 1, shadow, false);
+             g.drawString(font, Component.literal(text), x - 1, y - 1, shadow, false);
+             g.drawString(font, Component.literal(text), x, y, 0xFFFFFFFF, false);
+         }
 
     private static String normalizeAppNameForIcon(String displayName) {
         if (displayName == null) return null;
@@ -551,7 +601,8 @@ public class DesktopScreen extends Screen {
 
     private static String toTitleCase(String s) {
         if (s == null || s.isEmpty()) return s;
-        String base = s; if (base.toLowerCase().endsWith(".txt")) base = base.substring(0, base.length() - 4);
+        String base = s;
+        if (base.toLowerCase().endsWith(".txt")) base = base.substring(0, base.length() - 4);
         StringBuilder sb = new StringBuilder(); boolean capNext = true;
         for (char c : base.toCharArray()) {
             if (Character.isWhitespace(c) || c == '_' || c == '-') { sb.append(c); capNext = true; continue; }
@@ -560,17 +611,22 @@ public class DesktopScreen extends Screen {
         return sb.toString();
     }
 
-    private DraggableWindow findWindowAt(double mouseX, double mouseY) {
+    private DraggableWindow findWindowAt ( double mouseX, double mouseY){
         ListIterator<DraggableWindow> it = openApps.listIterator(openApps.size());
-        while (it.hasPrevious()) { DraggableWindow w = it.previous(); if (!w.minimized && w.isInside(mouseX, mouseY, taskbarHeight)) return w; }
+        while (it.hasPrevious()) {
+            DraggableWindow w = it.previous();
+            if (!w.minimized && w.isInside(mouseX, mouseY, taskbarHeight)) return w;
+        }
         return null;
     }
 
     @Override
-    public boolean isPauseScreen() { return false; }
+    public boolean isPauseScreen () {
+        return false;
+    }
 
     @Override
-    public void tick() {
+    public void tick () {
         super.tick();
         // If experimental setting was turned off while open, immediately stop fan
         if (fanStarted && fanLoopSound != null && !ConfigHandler.experimentalEnabled() && !fanLoopSound.isFinished()) {
@@ -581,46 +637,84 @@ public class DesktopScreen extends Screen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        searchBox.setWidth(180); searchBox.setX(6); searchBox.setY(height - taskbarHeight + 4);
+    public boolean mouseClicked ( double mouseX, double mouseY, int button){
+        searchBox.setWidth(180);
+        searchBox.setX(6);
+        searchBox.setY(height - taskbarHeight + 4);
         super.mouseClicked(mouseX, mouseY, button);
         // Left click -> trackpad sound; Right click -> separate mouse click sound (context menu or other)
         if (button == 0) {
-            try { LaptopKeySoundManager.playTrackpadClick(); } catch (Exception ignored) {}
+            try {
+                LaptopKeySoundManager.playTrackpadClick();
+            } catch (Exception ignored) {
+            }
         } else if (button == 1) {
-            try { LaptopKeySoundManager.playMouseClick(); } catch (Exception ignored) {}
+            try {
+                LaptopKeySoundManager.playMouseClick();
+            } catch (Exception ignored) {
+            }
         }
 
         if (contextMenu != null) {
             if (contextMenu.mouseClicked(mouseX, mouseY, button)) return true;
-            contextMenu = null; return true;
+            contextMenu = null;
+            return true;
         }
 
         if (button == 1) {
             boolean clickedOnIcon = false;
             if (renamingIcon != null && renameBox != null) {
-                int rx = Math.round(renamingIcon.displayX); int ry = Math.round(renamingIcon.displayY + renamingIcon.iconSize + 4);
-                int rw = Math.max(80, renamingIcon.iconSize); int rh = 16;
-                if (mouseX >= rx && mouseX <= rx + rw && mouseY >= ry && mouseY <= ry + rh) { renameBox.setFocused(true); return true; }
-                else {
+                int rx = Math.round(renamingIcon.displayX);
+                int ry = Math.round(renamingIcon.displayY + renamingIcon.iconSize + 4);
+                int rw = Math.max(80, renamingIcon.iconSize);
+                int rh = 16;
+                if (mouseX >= rx && mouseX <= rx + rw && mouseY >= ry && mouseY <= ry + rh) {
+                    renameBox.setFocused(true);
+                    return true;
+                } else {
                     String newName = renameBox.getValue().trim();
                     if (!newName.isEmpty() && !newName.equals(renamingIcon.name)) {
-                        File oldFile = new File(desktopDir, renamingIcon.name); File newFile = new File(desktopDir, newName);
-                        if (!newFile.exists()) { if (oldFile.exists()) oldFile.renameTo(newFile); FilesManager.getInstance().removeDesktopIcon(renamingIcon.name); FilesManager.getInstance().addDesktopIcon(newName, renamingIcon.targetX, renamingIcon.targetY); refreshDesktopIcons(); }
+                        File oldFile = new File(desktopDir, renamingIcon.name);
+                        File newFile = new File(desktopDir, newName);
+                        if (!newFile.exists()) {
+                            if (oldFile.exists()) oldFile.renameTo(newFile);
+                            FilesManager.getInstance().removeDesktopIcon(renamingIcon.name);
+                            FilesManager.getInstance().addDesktopIcon(newName, renamingIcon.targetX, renamingIcon.targetY);
+                            refreshDesktopIcons();
+                        }
                     }
-                    renamingIcon = null; renameBox = null; return false;
+                    renamingIcon = null;
+                    renameBox = null;
+                    return false;
                 }
             }
-            for (DesktopIcon icon : desktopIcons) if (icon.isInside(mouseX, mouseY, iconSize)) { clickedOnIcon = true; break; }
-            if (!clickedOnIcon) { showContextMenu((int)mouseX, (int)mouseY); return true; }
+            for (DesktopIcon icon : desktopIcons)
+                if (icon.isInside(mouseX, mouseY, iconSize)) {
+                    clickedOnIcon = true;
+                    break;
+                }
+            if (!clickedOnIcon) {
+                showContextMenu((int) mouseX, (int) mouseY);
+                return true;
+            }
         }
 
         int tbY = height - taskbarHeight;
         if (!searchBox.getValue().isEmpty() && !searchResults.isEmpty()) {
-            int popupW = Math.max(searchBox.getWidth(), 260); int entries = Math.min(searchResults.size(), 6); int popupH = entries * RESULT_HEIGHT + 6; int popupX = searchBox.getX(); int popupY = tbY - popupH - 6; if (popupY < 6) popupY = 6;
+            int popupW = Math.max(searchBox.getWidth(), 260);
+            int entries = Math.min(searchResults.size(), 6);
+            int popupH = entries * RESULT_HEIGHT + 6;
+            int popupX = searchBox.getX();
+            int popupY = tbY - popupH - 6;
+            if (popupY < 6) popupY = 6;
             if (mouseX >= popupX && mouseX <= popupX + popupW && mouseY >= popupY && mouseY <= popupY + popupH) {
-                int idx = (int)((mouseY - (popupY + 6)) / RESULT_HEIGHT);
-                if (idx >= 0 && idx < Math.min(searchResults.size(), 6)) { searchResults.get(idx).action.run(); searchBox.setValue(""); searchResults.clear(); playClick(); }
+                int idx = (int) ((mouseY - (popupY + 6)) / RESULT_HEIGHT);
+                if (idx >= 0 && idx < Math.min(searchResults.size(), 6)) {
+                    searchResults.get(idx).action.run();
+                    searchBox.setValue("");
+                    searchResults.clear();
+                    playClick();
+                }
                 return super.mouseClicked(mouseX, mouseY, button);
             }
         }
@@ -629,33 +723,89 @@ public class DesktopScreen extends Screen {
         if (top != null) {
             bringToFront(top);
             int[] rr = top.getRenderRect(taskbarHeight);
-            if (mouseY >= rr[1] && mouseY <= rr[1] + 26) { top.handleTitlebarClick(mouseX, mouseY, button, taskbarHeight); playClick(); return super.mouseClicked(mouseX, mouseY, button); }
+            if (mouseY >= rr[1] && mouseY <= rr[1] + 26) {
+                top.handleTitlebarClick(mouseX, mouseY, button, taskbarHeight);
+                playClick();
+                return super.mouseClicked(mouseX, mouseY, button);
+            }
             boolean consumed = top.app.mouseClicked(top, mouseX, mouseY, button);
-            if (consumed) { playClick(); return super.mouseClicked(mouseX, mouseY, button); }
+            if (consumed) {
+                playClick();
+                return super.mouseClicked(mouseX, mouseY, button);
+            }
             return super.mouseClicked(mouseX, mouseY, button);
         }
 
         if (mouseY >= tbY && mouseY <= height) {
-            int tx = 6 + searchBox.getWidth() + 8; int perEntry = 44; int rightReserved = 120; int available = Math.max(0, width - tx - rightReserved); int maxEntries = Math.max(0, available / perEntry);
-            List<DraggableWindow> visibleWindows = new ArrayList<>(); if (maxEntries > 0) { int start = Math.max(0, openApps.size() - maxEntries); for (int i = start; i < openApps.size(); i++) { DraggableWindow w0 = openApps.get(i); if (isTaskbarEligible(w0)) visibleWindows.add(w0); } }
-            int tx2 = tx; for (DraggableWindow w : visibleWindows) { int x0 = tx2, y0 = tbY + 2, x1 = tx2 + perEntry - 6, y1 = height - 4; if (mouseX >= x0 && mouseX <= x1 && mouseY >= y0 && mouseY <= y1) { if (w.minimized) { w.restore(); bringToFront(w); } else if (openApps.get(openApps.size()-1) != w) bringToFront(w); else { w.minimized = true; } playClick(); return super.mouseClicked(mouseX, mouseY, button); } tx2 += perEntry; }
-            selectedIcons.clear(); return super.mouseClicked(mouseX, mouseY, button);
+            int tx = 6 + searchBox.getWidth() + 8;
+            int perEntry = 44;
+            int rightReserved = 120;
+            int available = Math.max(0, width - tx - rightReserved);
+            int maxEntries = Math.max(0, available / perEntry);
+            List<DraggableWindow> visibleWindows = new ArrayList<>();
+            if (maxEntries > 0) {
+                int start = Math.max(0, openApps.size() - maxEntries);
+                for (int i = start; i < openApps.size(); i++) {
+                    DraggableWindow w0 = openApps.get(i);
+                    if (isTaskbarEligible(w0)) visibleWindows.add(w0);
+                }
+            }
+            int tx2 = tx;
+            for (DraggableWindow w : visibleWindows) {
+                int x0 = tx2, y0 = tbY + 2, x1 = tx2 + perEntry - 6, y1 = height - 4;
+                if (mouseX >= x0 && mouseX <= x1 && mouseY >= y0 && mouseY <= y1) {
+                    if (w.minimized) {
+                        w.restore();
+                        bringToFront(w);
+                    } else if (openApps.get(openApps.size() - 1) != w) bringToFront(w);
+                    else {
+                        w.minimized = true;
+                    }
+                    playClick();
+                    return super.mouseClicked(mouseX, mouseY, button);
+                }
+                tx2 += perEntry;
+            }
+            selectedIcons.clear();
+            return super.mouseClicked(mouseX, mouseY, button);
         }
 
         for (DesktopIcon di : desktopIcons) {
             if (di.isInside(mouseX, mouseY, iconSize)) {
                 long now = System.currentTimeMillis();
-                if (selectedIcons.contains(di) && (now - lastClickTime) < DOUBLE_CLICK_MS) { di.onClick.run(); selectedIcons.clear(); iconPressed = null; iconDragging = false; playClick(); }
-                else { selectedIcons.clear(); selectedIcons.add(di); iconPressed = di; iconDragging = false; iconDragStartX = mouseX; iconDragStartY = mouseY; iconStartPositions.clear(); for (DesktopIcon ic : selectedIcons) iconStartPositions.put(ic, new int[]{ic.targetX, ic.targetY}); lastClickTime = now; }
+                if (selectedIcons.contains(di) && (now - lastClickTime) < DOUBLE_CLICK_MS) {
+                    di.onClick.run();
+                    selectedIcons.clear();
+                    iconPressed = null;
+                    iconDragging = false;
+                    playClick();
+                } else {
+                    selectedIcons.clear();
+                    selectedIcons.add(di);
+                    iconPressed = di;
+                    iconDragging = false;
+                    iconDragStartX = mouseX;
+                    iconDragStartY = mouseY;
+                    iconStartPositions.clear();
+                    for (DesktopIcon ic : selectedIcons)
+                        iconStartPositions.put(ic, new int[]{ic.targetX, ic.targetY});
+                    lastClickTime = now;
+                }
                 return super.mouseClicked(mouseX, mouseY, button);
             }
         }
 
-        selectedIcons.clear(); iconPressed = null; iconDragging = false; selecting = true; selectStartX = selectEndX = (int)mouseX; selectStartY = selectEndY = (int)mouseY; return super.mouseClicked(mouseX, mouseY, button);
+        selectedIcons.clear();
+        iconPressed = null;
+        iconDragging = false;
+        selecting = true;
+        selectStartX = selectEndX = (int) mouseX;
+        selectStartY = selectEndY = (int) mouseY;
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+    public boolean mouseReleased ( double mouseX, double mouseY, int button){
         if (iconDragging && !selectedIcons.isEmpty()) {
             for (DesktopIcon ic : selectedIcons) {
                 ic.targetX = (ic.targetX / ICON_GRID) * ICON_GRID;
@@ -674,22 +824,37 @@ public class DesktopScreen extends Screen {
                 if (ix1 >= x0 && ix0 <= x1 && iy1 >= y0 && iy0 <= y1) selectedIcons.add(ic);
             }
         }
-        iconDragging = false; iconPressed = null; iconStartPositions.clear(); selecting = false;
+        iconDragging = false;
+        iconPressed = null;
+        iconStartPositions.clear();
+        selecting = false;
         searchBox.mouseReleased(mouseX, mouseY, button);
         for (DraggableWindow w : openApps) w.mouseReleased(mouseX, mouseY, button);
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int button, double dx, double dy) {
+    public boolean mouseDragged ( double mouseX, double mouseY, int button, double dx, double dy){
         if (iconPressed != null && button == 0) {
-            if (!iconDragging) { iconDragging = true; iconStartPositions.clear(); for (DesktopIcon ic : selectedIcons) iconStartPositions.put(ic, new int[]{ic.targetX, ic.targetY}); iconDragStartX = mouseX; iconDragStartY = mouseY; }
-            int deltaX = (int)(mouseX - iconDragStartX); int deltaY = (int)(mouseY - iconDragStartY);
-            for (DesktopIcon ic : selectedIcons) { int[] s = iconStartPositions.getOrDefault(ic, new int[]{ic.targetX, ic.targetY}); ic.targetX = s[0] + deltaX; ic.targetY = s[1] + deltaY; }
+            if (!iconDragging) {
+                iconDragging = true;
+                iconStartPositions.clear();
+                for (DesktopIcon ic : selectedIcons) iconStartPositions.put(ic, new int[]{ic.targetX, ic.targetY});
+                iconDragStartX = mouseX;
+                iconDragStartY = mouseY;
+            }
+            int deltaX = (int) (mouseX - iconDragStartX);
+            int deltaY = (int) (mouseY - iconDragStartY);
+            for (DesktopIcon ic : selectedIcons) {
+                int[] s = iconStartPositions.getOrDefault(ic, new int[]{ic.targetX, ic.targetY});
+                ic.targetX = s[0] + deltaX;
+                ic.targetY = s[1] + deltaY;
+            }
             return super.mouseDragged(mouseX, mouseY, button, dx, dy);
         }
         if (selecting && !iconDragging) {
-            selectEndX = (int) mouseX; selectEndY = (int) mouseY;
+            selectEndX = (int) mouseX;
+            selectEndY = (int) mouseY;
             int x0 = Math.min(selectStartX, selectEndX), y0 = Math.min(selectStartY, selectEndY);
             int x1 = Math.max(selectStartX, selectEndX), y1 = Math.max(selectStartY, selectEndY);
             selectedIcons.clear();
@@ -699,63 +864,116 @@ public class DesktopScreen extends Screen {
                 if (ix1 >= x0 && ix0 <= x1 && iy1 >= y0 && iy0 <= y1) selectedIcons.add(ic);
             }
         }
-        DraggableWindow fw = findWindowAt(mouseX, mouseY); if (fw != null) fw.mouseDragged(mouseX, mouseY);
+        DraggableWindow fw = findWindowAt(mouseX, mouseY);
+        if (fw != null) fw.mouseDragged(mouseX, mouseY);
         searchBox.mouseDragged(mouseX, mouseY, button, dx, dy);
         return super.mouseDragged(mouseX, mouseY, button, dx, dy);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+    public boolean mouseScrolled ( double mouseX, double mouseY, double delta){
         DraggableWindow top = findWindowAt(mouseX, mouseY);
         if (top != null && !top.minimized) return top.mouseScrolled(mouseX, mouseY, delta);
         return super.mouseScrolled(mouseX, mouseY, delta);
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == 341 || keyCode == 345) { ctrlPressed = true; return true; }
-        if (keyCode == 340 || keyCode == 344) { shiftPressed = true; return true; }
+    public boolean keyPressed ( int keyCode, int scanCode, int modifiers){
+        if (keyCode == 341 || keyCode == 345) {
+            ctrlPressed = true;
+            return true;
+        }
+        if (keyCode == 340 || keyCode == 344) {
+            shiftPressed = true;
+            return true;
+        }
         if (keyCode == 32) { // spacebar
-            try { LaptopKeySoundManager.playKey(' '); } catch (Exception ignored) {}
+            try {
+                LaptopKeySoundManager.playKey(' ');
+            } catch (Exception ignored) {
+            }
             sendTypingPacketMaybe();
             return true;
         }
         if (ctrlPressed) {
             switch (keyCode) {
-                case 65: selectAllIcons(); return true;
-                case 67: copySelectedIcons(); return true;
-                case 86: pasteFromClipboard(); return true;
-                case 88: cutSelectedIcons(); return true;
-                case 78: createNewFolderOnDesktop(); return true;
-                case 83: return handleAppSpecificKeybind(keyCode, scanCode, modifiers);
+                case 65:
+                    selectAllIcons();
+                    return true;
+                case 67:
+                    copySelectedIcons();
+                    return true;
+                case 86:
+                    pasteFromClipboard();
+                    return true;
+                case 88:
+                    cutSelectedIcons();
+                    return true;
+                case 78:
+                    createNewFolderOnDesktop();
+                    return true;
+                case 83:
+                    return handleAppSpecificKeybind(keyCode, scanCode, modifiers);
                 case 87:
-                    if (shiftPressed) net.chaoscraft.chaoscrafts_device_mod.client.screen.DraggableWindow.closeAllWindows();
-                    else if (!openApps.isEmpty()) { DraggableWindow top = openApps.get(openApps.size()-1); if (top != null) { top.requestClose(); playClick(); } }
+                    if (shiftPressed)
+                        net.chaoscraft.chaoscrafts_device_mod.client.screen.DraggableWindow.closeAllWindows();
+                    else if (!openApps.isEmpty()) {
+                        DraggableWindow top = openApps.get(openApps.size() - 1);
+                        if (top != null) {
+                            top.requestClose();
+                            playClick();
+                        }
+                    }
                     return true;
             }
         }
-        if (keyCode == 292) { showDebugInfo = !showDebugInfo; return true; }
-        if (keyCode == 256) { if (contextMenu != null) { contextMenu = null; return true; } Minecraft.getInstance().setScreen(null); return true; }
-        if (!openApps.isEmpty()) { DraggableWindow top = openApps.get(openApps.size()-1); if (top != null && !top.minimized) { boolean consumed = top.app.keyPressed(top, keyCode, scanCode, modifiers); if (consumed) return true; } }
+        if (keyCode == 292) {
+            showDebugInfo = !showDebugInfo;
+            return true;
+        }
+        if (keyCode == 256) {
+            if (contextMenu != null) {
+                contextMenu = null;
+                return true;
+            }
+            Minecraft.getInstance().setScreen(null);
+            return true;
+        }
+        if (!openApps.isEmpty()) {
+            DraggableWindow top = openApps.get(openApps.size() - 1);
+            if (top != null && !top.minimized) {
+                boolean consumed = top.app.keyPressed(top, keyCode, scanCode, modifiers);
+                if (consumed) return true;
+            }
+        }
         if (searchBox.isFocused()) return searchBox.keyPressed(keyCode, scanCode, modifiers);
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
-    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
-        if (keyCode == 341 || keyCode == 345) { ctrlPressed = false; return true; }
-        if (keyCode == 340 || keyCode == 344) { shiftPressed = false; return true; }
+    public boolean keyReleased ( int keyCode, int scanCode, int modifiers){
+        if (keyCode == 341 || keyCode == 345) {
+            ctrlPressed = false;
+            return true;
+        }
+        if (keyCode == 340 || keyCode == 344) {
+            shiftPressed = false;
+            return true;
+        }
         return super.keyReleased(keyCode, scanCode, modifiers);
     }
 
     @Override
-    public boolean charTyped(char typedChar, int keyCode) {
+    public boolean charTyped ( char typedChar, int keyCode){
         if (typedChar != 0 && typedChar != ' ' && !Character.isISOControl(typedChar)) {
-            try { LaptopKeySoundManager.playKey(typedChar); } catch (Exception ignored) {}
+            try {
+                LaptopKeySoundManager.playKey(typedChar);
+            } catch (Exception ignored) {
+            }
             sendTypingPacketMaybe();
         }
         if (!openApps.isEmpty()) {
-            DraggableWindow top = openApps.get(openApps.size()-1);
+            DraggableWindow top = openApps.get(openApps.size() - 1);
             if (top != null && !top.minimized) {
                 boolean consumed = top.app.charTyped(top, typedChar, keyCode);
                 if (consumed) return true;
@@ -765,111 +983,208 @@ public class DesktopScreen extends Screen {
         return super.charTyped(typedChar, keyCode);
     }
 
-    private boolean handleAppSpecificKeybind(int keyCode, int scanCode, int modifiers) {
-        if (!openApps.isEmpty()) { DraggableWindow top = openApps.get(openApps.size()-1); if (top != null && !top.minimized) return top.app.keyPressed(top, keyCode, scanCode, modifiers); }
+    private boolean handleAppSpecificKeybind ( int keyCode, int scanCode, int modifiers){
+        if (!openApps.isEmpty()) {
+            DraggableWindow top = openApps.get(openApps.size() - 1);
+            if (top != null && !top.minimized) return top.app.keyPressed(top, keyCode, scanCode, modifiers);
+        }
         return false;
     }
 
-    private void playClick() { Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F)); }
+    private void playClick () {
+        Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1.0F));
+    }
 
-    public void openAppSingle(String name, int w, int h) {
-        for (DraggableWindow w0 : openApps) { if (w0.appName.equalsIgnoreCase(name)) { w0.restore(); w0.removeRequested = false; bringToFront(w0); return; } }
-        IApp app = AppFactory.create(name); if (app == null) return;
+    public void openAppSingle (String name,int w, int h){
+        for (DraggableWindow w0 : openApps) {
+            if (w0.appName.equalsIgnoreCase(name)) {
+                w0.restore();
+                w0.removeRequested = false;
+                bringToFront(w0);
+                return;
+            }
+        }
+        IApp app = AppFactory.create(name);
+        if (app == null) return;
         int startX = Math.max(40, (this.width - w) / 2);
         int startY = Math.max(40, (this.height - h) / 3);
         DraggableWindow wdw = new DraggableWindow(name, app, Math.min(w, this.width - 80), Math.min(h, this.height - 80), startX, startY);
-        openApps.add(wdw); bringToFront(wdw);
+        openApps.add(wdw);
+        bringToFront(wdw);
     }
 
-    private void bringToFront(DraggableWindow w) { openApps.remove(w); openApps.add(w); }
+    private void bringToFront (DraggableWindow w){
+        openApps.remove(w);
+        openApps.add(w);
+    }
 
-    public void showContextMenu(int x, int y) { this.contextMenu = new DesktopContextMenu(this, x, y); }
+    public void showContextMenu ( int x, int y){
+        this.contextMenu = new DesktopContextMenu(this, x, y);
+    }
 
-    public void refreshDesktopIcons() {
-        desktopIcons.clear(); List<FilesManager.DesktopIconState> iconStates = FilesManager.getInstance().getDesktopIcons();
+    public void refreshDesktopIcons () {
+        desktopIcons.clear();
+        List<FilesManager.DesktopIconState> iconStates = FilesManager.getInstance().getDesktopIcons();
         for (FilesManager.DesktopIconState state : iconStates) {
             if (AppRegistry.getInstance().isInstalled(state.name)) {
                 desktopIcons.add(new DesktopIcon(state.name, state.x, state.y, () -> {
-                    if (state.name.endsWith(".txt")) openAppSingle("Files", 780, 520); else openAppSingle(state.name, 900, 600);
+                    if (state.name.endsWith(".txt")) openAppSingle("Files", 780, 520);
+                    else openAppSingle(state.name, 900, 600);
                 }));
             }
         }
     }
 
-    public void setIconSize(int size) { this.iconSize = size; for (DesktopIcon icon : desktopIcons) icon.iconSize = size; }
-    public void refresh() { FilesManager.getInstance().saveState(); }
-    public void openSettingsApp() { openAppSingle("Settings", 520, 480); }
-    public void sortIconsByName() { desktopIcons.sort((a,b)->a.name.compareToIgnoreCase(b.name)); arrangeIconsInGrid(); }
-    public void sortIconsByDate() { sortIconsByName(); }
-    public void sortIconsBySize() { sortIconsByName(); }
+    public void setIconSize ( int size){
+        this.iconSize = size;
+        for (DesktopIcon icon : desktopIcons) icon.iconSize = size;
+    }
+    public void refresh () {
+        FilesManager.getInstance().saveState();
+    }
+    public void openSettingsApp () {
+        openAppSingle("Settings", 520, 480);
+    }
+    public void sortIconsByName () {
+        desktopIcons.sort((a, b) -> a.name.compareToIgnoreCase(b.name));
+        arrangeIconsInGrid();
+    }
+    public void sortIconsByDate () {
+        sortIconsByName();
+    }
+    public void sortIconsBySize () {
+        sortIconsByName();
+    }
 
-    private void arrangeIconsInGrid() {
-        int cols = Math.max(1, (width - 100) / (iconSize + 80)); int x = 50; int y = 60; int col = 0;
+    private void arrangeIconsInGrid () {
+        int cols = Math.max(1, (width - 100) / (iconSize + 80));
+        int x = 50;
+        int y = 60;
+        int col = 0;
         for (DesktopIcon icon : desktopIcons) {
-            icon.targetX = x; icon.targetY = y; col++;
-            if (col >= cols) { col = 0; x = 50; y += iconSize + 40; } else { x += iconSize + 80; }
+            icon.targetX = x;
+            icon.targetY = y;
+            col++;
+            if (col >= cols) {
+                col = 0;
+                x = 50;
+                y += iconSize + 40;
+            } else {
+                x += iconSize + 80;
+            }
             FilesManager.getInstance().updateDesktopIconPosition(icon.name, icon.targetX, icon.targetY);
         }
     }
 
-    private void selectAllIcons() { selectedIcons.clear(); selectedIcons.addAll(desktopIcons); }
-    private void copySelectedIcons() {}
-    private void cutSelectedIcons() {}
-    private void pasteFromClipboard() {}
-
-    public void createNewFolderOnDesktop() {
-        String baseName = "New Folder"; String name = baseName; int counter = 1;
-        while (new File(desktopDir, name).exists()) { name = baseName + " (" + counter + ")"; counter++; }
-        File newFolder = new File(desktopDir, name);
-        if (newFolder.mkdir()) { FilesManager.getInstance().addDesktopIcon(name, (int)(Math.random()*(width-100))+50, (int)(Math.random()*(height-100))+50); refreshDesktopIcons(); }
+    private void selectAllIcons () {
+        selectedIcons.clear();
+        selectedIcons.addAll(desktopIcons);
+    }
+    private void copySelectedIcons () {
+    }
+    private void cutSelectedIcons () {
+    }
+    private void pasteFromClipboard () {
     }
 
-    public void createNewTextFileOnDesktop() {
-        String name = "New Text File.txt"; int counter = 1;
-        while (new File(desktopDir, name).exists()) { name = "New Text File (" + counter + ").txt"; counter++; }
+    public void createNewFolderOnDesktop () {
+        String baseName = "New Folder";
+        String name = baseName;
+        int counter = 1;
+        while (new File(desktopDir, name).exists()) {
+            name = baseName + " (" + counter + ")";
+            counter++;
+        }
+        File newFolder = new File(desktopDir, name);
+        if (newFolder.mkdir()) {
+            FilesManager.getInstance().addDesktopIcon(name, (int) (Math.random() * (width - 100)) + 50, (int) (Math.random() * (height - 100)) + 50);
+            refreshDesktopIcons();
+        }
+    }
+
+    public void createNewTextFileOnDesktop () {
+        String name = "New Text File.txt";
+        int counter = 1;
+        while (new File(desktopDir, name).exists()) {
+            name = "New Text File (" + counter + ").txt";
+            counter++;
+        }
         File newFile = new File(desktopDir, name);
-        try { if (newFile.createNewFile()) { FilesManager.getInstance().addDesktopIcon(name, (int)(Math.random()*(width-100))+50, (int)(Math.random()*(height-100))+50); refreshDesktopIcons(); } }
-        catch (IOException e) { System.err.println("Failed to create new text file: " + e); }
+        try {
+            if (newFile.createNewFile()) {
+                FilesManager.getInstance().addDesktopIcon(name, (int) (Math.random() * (width - 100)) + 50, (int) (Math.random() * (height - 100)) + 50);
+                refreshDesktopIcons();
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to create new text file: " + e);
+        }
     }
 
     // adjust sendTypingPacketMaybe to include devicePos
-    private void sendTypingPacketMaybe() {
+    private void sendTypingPacketMaybe () {
         long now = System.currentTimeMillis();
         if (now - lastKeyTypeMillis >= KEY_PACKET_COOLDOWN_MS) {
             lastKeyTypeMillis = now;
-            try { NetworkHandler.sendToServer(new LaptopTypingPacket(devicePos)); } catch (Exception ignored) {}
+            try {
+                NetworkHandler.sendToServer(new LaptopTypingPacket(devicePos));
+            } catch (Exception ignored) {
+            }
         }
     }
 
-    private static class SearchResult { final String displayName; final ResourceLocation iconRes; final Runnable action; SearchResult(String d, ResourceLocation i, Runnable a){displayName=d;iconRes=i;action=a;} }
+    private static class SearchResult {
+        final String displayName;
+        final ResourceLocation iconRes;
+        final Runnable action;
+
+        SearchResult(String d, ResourceLocation i, Runnable a) {
+            displayName = d;
+            iconRes = i;
+            action = a;
+        }
+    }
 
     private static class DesktopIcon {
-            final String name; int targetX, targetY; float displayX, displayY; final Runnable onClick; int iconSize = 32;
-            DesktopIcon(String name, int x, int y, Runnable onClick) { this.name = name; this.targetX = (x / ICON_GRID) * ICON_GRID; this.targetY = (y / ICON_GRID) * ICON_GRID; this.displayX = this.targetX; this.displayY = this.targetY; this.onClick = onClick; }
-            void render(GuiGraphics g, int mouseX, int mouseY, boolean selected, int currentIconSize) {
-                this.iconSize = currentIconSize; int dx = Math.round(displayX), dy = Math.round(displayY);
-                boolean hover = mouseX >= dx && mouseX <= dx + iconSize && mouseY >= dy && mouseY <= dy + iconSize;
-                if (selected) g.fill(dx - 6, dy - 6, dx + iconSize + 6, dy + iconSize + 14, 0x2233AAFF);
-                g.fill(dx - 1, dy + iconSize + 1, dx + iconSize, dy + iconSize + 3, 0xAA000000);
-                String key = name.contains(".") ? null : normalizeAppNameForIcon(name);
-                ResourceLocation iconRes = IconManager.getIconResource(key);
-                try { g.blit(iconRes, dx + 2, dy + 2, 0, 0, iconSize - 4, iconSize - 4, iconSize - 4, iconSize - 4); } catch (Exception ignored) {}
-                if (hover) g.fill(dx - 2, dy - 2, dx + iconSize + 2, dy + iconSize + 2, DraggableWindow.selectionOverlayColor());
-                String displayName = toTitleCase(name);
-                if (Minecraft.getInstance().font.width(displayName) > iconSize + 10) displayName = Minecraft.getInstance().font.plainSubstrByWidth(displayName, iconSize + 5) + "...";
-                // Draw a subtle dark outline/shadow around the label (multi-offset) to ensure legibility on any wallpaper
-                int textX = dx;
-                int textY = dy + iconSize + 4;
-                int shadowColor = DraggableWindow.darkTheme ? 0x55000000 : 0xAA000000; // lighter shadow in dark theme
-                var font = Minecraft.getInstance().font;
-                // four-offset outline
-                g.drawString(font, Component.literal(displayName), textX + 1, textY + 1, shadowColor, false);
-                g.drawString(font, Component.literal(displayName), textX - 1, textY + 1, shadowColor, false);
-                g.drawString(font, Component.literal(displayName), textX + 1, textY - 1, shadowColor, false);
-                g.drawString(font, Component.literal(displayName), textX - 1, textY - 1, shadowColor, false);
-                // main label
-                g.drawString(font, Component.literal(displayName), textX, textY, DraggableWindow.textPrimaryColor(), false);
-            }
-            boolean isInside(double mouseX, double mouseY, int currentIconSize) { return mouseX >= displayX && mouseX <= displayX + currentIconSize && mouseY >= displayY && mouseY <= displayY + currentIconSize; }
+        final String name;
+        int targetX, targetY;
+        float displayX, displayY;
+        final Runnable onClick;
+        int iconSize = 32;
+
+        DesktopIcon(String name, int x, int y, Runnable onClick) {
+            this.name = name;
+            this.targetX = (x / ICON_GRID) * ICON_GRID;
+            this.targetY = (y / ICON_GRID) * ICON_GRID;
+            this.displayX = this.targetX;
+            this.displayY = this.targetY;
+            this.onClick = onClick;
         }
+
+        void render(GuiGraphics g, int mouseX, int mouseY, boolean selected, int currentIconSize) {
+            this.iconSize = currentIconSize;
+            int dx = Math.round(displayX), dy = Math.round(displayY);
+            boolean hover = mouseX >= dx && mouseX <= dx + iconSize && mouseY >= dy && mouseY <= dy + iconSize;
+            if (selected) g.fill(dx - 6, dy - 6, dx + iconSize + 6, dy + iconSize + 14, 0x2233AAFF);
+            g.fill(dx - 1, dy + iconSize + 1, dx + iconSize, dy + iconSize + 3, 0xAA000000);
+            String key = name.contains(".") ? null : normalizeAppNameForIcon(name);
+            ResourceLocation iconRes = IconManager.getIconResource(key);
+            try {
+                g.blit(iconRes, dx + 2, dy + 2, 0, 0, iconSize - 4, iconSize - 4, iconSize - 4, iconSize - 4);
+            } catch (Exception ignored) {
+            }
+            if (hover)
+                g.fill(dx - 2, dy - 2, dx + iconSize + 2, dy + iconSize + 2, DraggableWindow.selectionOverlayColor());
+            String displayName = toTitleCase(name);
+            if (Minecraft.getInstance().font.width(displayName) > iconSize + 10)
+                displayName = Minecraft.getInstance().font.plainSubstrByWidth(displayName, iconSize + 5) + "...";
+            // Draw label using the centralized shadow+white helper so it stays white in both themes
+            int textX = dx;
+            int textY = dy + iconSize + 4;
+            drawShadowedString(g, Minecraft.getInstance().font, displayName, textX, textY);
+        }
+
+        boolean isInside(double mouseX, double mouseY, int currentIconSize) {
+            return mouseX >= displayX && mouseX <= displayX + currentIconSize && mouseY >= displayY && mouseY <= displayY + currentIconSize;
+        }
+    }
 }
