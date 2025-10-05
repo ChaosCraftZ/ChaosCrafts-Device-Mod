@@ -58,8 +58,8 @@ public class PaintApp implements IApp {
         int cx = r[0] + 8, cy = r[1] + 32;
         int cw = r[2] - 16, ch = r[3] - 40;
 
-        // Toolbar
-        guiGraphics.fill(cx, cy, cx + cw, cy + 36, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFF0F0F0);
+        // Toolbar (alt surface — slightly darker than main canvas in light mode)
+        guiGraphics.fill(cx, cy, cx + cw, cy + 36, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
 
         // Clear button
         guiGraphics.fill(cx + 6, cy + 6, cx + 56, cy + 26, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
@@ -103,17 +103,18 @@ public class PaintApp implements IApp {
 
          // Current color preview
         guiGraphics.fill(hexInputX + 86, cy + 6, hexInputX + 106, cy + 26, currentColor);
-        guiGraphics.fill(hexInputX + 85, cy + 5, hexInputX + 107, cy + 27, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFCCCCCC);
+        // preview border: use alt surface in light mode so it reads darker than the main canvas
+        guiGraphics.fill(hexInputX + 85, cy + 5, hexInputX + 107, cy + 27, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFBFBFBF);
 
          // Color picker dialog
          if (colorPickerOpen) {
              renderColorPicker(guiGraphics, cx, cy, cw, ch);
          }
 
-         // Canvas area
+         // Canvas area (main surface in light mode should be slightly lighter than other UI chrome)
          int canvasX = cx, canvasY = cy + 36;
          int canvasW = cw, canvasH = ch - 36;
-        guiGraphics.fill(canvasX, canvasY, canvasX + canvasW, canvasY + canvasH, DraggableWindow.darkTheme ? 0xFF0F0F0F : 0xFFFFFFFF);
+        guiGraphics.fill(canvasX, canvasY, canvasX + canvasW, canvasY + canvasH, DraggableWindow.darkTheme ? 0xFF0F0F0F : 0xFFCCCCCC);
         // Draw grid for better visibility
         int gridColor = DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFEEEEEE;
         for (int x = canvasX; x <= canvasX + canvasW; x += 10) {
@@ -140,9 +141,9 @@ public class PaintApp implements IApp {
         int pickerW = 250;
         int pickerH = 200;
 
-        // Color picker background
-        guiGraphics.fill(pickerX, pickerY, pickerX + pickerW, pickerY + pickerH, DraggableWindow.darkTheme ? 0xFF333333 : 0xFFFFFFFF);
-        guiGraphics.fill(pickerX - 1, pickerY - 1, pickerX + pickerW + 1, pickerY + pickerH + 1, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFCCCCCC);
+        // Color picker background (alt surface in light mode)
+        guiGraphics.fill(pickerX, pickerY, pickerX + pickerW, pickerY + pickerH, DraggableWindow.darkTheme ? 0xFF333333 : 0xFFBFBFBF);
+        guiGraphics.fill(pickerX - 1, pickerY - 1, pickerX + pickerW + 1, pickerY + pickerH + 1, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFBFBFBF);
 
         // Hue slider (vertical)
         int hueX = pickerX + pickerW - 20;

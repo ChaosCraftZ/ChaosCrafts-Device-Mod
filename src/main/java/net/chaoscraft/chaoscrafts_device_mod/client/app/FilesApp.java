@@ -94,8 +94,8 @@ public class FilesApp implements IApp {
             return;
         }
 
-        // Header with navigation
-        guiGraphics.fill(cx, cy, cx + cw, cy + 30, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFF0F0F0);
+        // Header with navigation (alt surface in light mode)
+        guiGraphics.fill(cx, cy, cx + cw, cy + 30, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Files"), cx + 10, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
         // Navigation buttons
@@ -112,8 +112,8 @@ public class FilesApp implements IApp {
         String path = getCurrentPath();
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(path), cx + 100, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
-        // Search box
-        guiGraphics.fill(cx, cy + 35, cx + 200, cy + 55, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFF0F0F0);
+        // Search box (alt surface in light mode)
+        guiGraphics.fill(cx, cy + 35, cx + 200, cy + 55, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Search:"), cx + 5, cy + 40, DraggableWindow.textPrimaryColor(), false);
 
         // File operation buttons
@@ -172,9 +172,9 @@ public class FilesApp implements IApp {
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Paste"), pasteX + 8, by + 4, DraggableWindow.textPrimaryColor(), false);
         }
 
-        // Column headers
+        // Column headers (alt surface in light mode)
         int listY = by + btnH + 8;
-        guiGraphics.fill(cx, listY, cx + cw, listY + 20, DraggableWindow.darkTheme ? 0xFF444444 : 0xFFEFEFEF);
+        guiGraphics.fill(cx, listY, cx + cw, listY + 20, DraggableWindow.darkTheme ? 0xFF444444 : 0xFFBFBFBF);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Name"), cx + 6, listY + 6, DraggableWindow.textPrimaryColor(), false);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Date modified"), cx + cw/2 - 60, listY + 6, DraggableWindow.textPrimaryColor(), false);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Type"), cx + cw - 180, listY + 6, DraggableWindow.textPrimaryColor(), false);
@@ -291,11 +291,11 @@ public class FilesApp implements IApp {
         guiGraphics.fill(cx + cw - 200, cy + 5, cx + cw - 110, cy + 25, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Cancel"), cx + cw - 185, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
-        // Text editor area
+        // Text editor area (main editor surface in light mode)
         int editorY = cy + 40;
         int editorH = ch - 40;
 
-        guiGraphics.fill(cx, editorY, cx + cw, editorY + editorH, DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFFFAFAFA);
+        guiGraphics.fill(cx, editorY, cx + cw, editorY + editorH, DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFFCCCCCC);
 
         if (fileEditor == null) {
             fileEditor = new EditBox(Minecraft.getInstance().font, cx + 10, editorY + 10, cw - 20, editorH - 20, Component.literal(""));
