@@ -248,7 +248,8 @@ public class NotepadApp implements IApp {
 
         // Menu bar
         if (showMenuBar) {
-            guiGraphics.fill(cx, cy, cx + cw, cy + 24, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFF0F0F0);
+            // Use a slightly darker light-mode surface so menu elements read darker than the main text area
+            guiGraphics.fill(cx, cy, cx + cw, cy + 24, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("File"), cx + 8, cy + 6, DraggableWindow.textPrimaryColor(), false);
             // Save button in the menu bar for quick access
             int saveBtnX = cx + 64;
@@ -261,11 +262,13 @@ public class NotepadApp implements IApp {
             if (fileMenuOpen) {
                 int mx = cx + 8, my = cy + 24;
                 int menuH = fileMenuItemHeight * (fileMenuItems.length + Math.min(5, recentFiles.size()));
-                guiGraphics.fill(mx, my, mx + fileMenuWidth, my + menuH, DraggableWindow.darkTheme ? 0xFF444444 : 0xFFFFFFFF);
+                // file menu background: slightly darker in light mode than the main editor
+                guiGraphics.fill(mx, my, mx + fileMenuWidth, my + menuH, DraggableWindow.darkTheme ? 0xFF444444 : 0xFFBFBFBF);
                 int idx = 0;
                 for (String item : fileMenuItems) {
                     if (item.equals("-")) {
-                        guiGraphics.fill(mx, my + idx * fileMenuItemHeight, mx + fileMenuWidth, my + (idx + 1) * fileMenuItemHeight, DraggableWindow.darkTheme ? 0xFF222222 : 0xFFEFEFEF);
+                        // separator line area: use darker light-mode shade
+                        guiGraphics.fill(mx, my + idx * fileMenuItemHeight, mx + fileMenuWidth, my + (idx + 1) * fileMenuItemHeight, DraggableWindow.darkTheme ? 0xFF222222 : 0xFFBFBFBF);
                     } else {
                         int bg = (fileMenuSelected == idx) ? (DraggableWindow.darkTheme ? 0xFF6666AA : 0xFFDDDDEE) : 0x00000000;
                         guiGraphics.fill(mx, my + idx * fileMenuItemHeight, mx + fileMenuWidth, my + (idx + 1) * fileMenuItemHeight, bg);
@@ -275,6 +278,7 @@ public class NotepadApp implements IApp {
                 }
                 // Recent files
                 if (!recentFiles.isEmpty()) {
+                    // "Recent files" heading should also use a darker light-mode background behind it
                     guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Recent files:"), mx + 8, my + idx * fileMenuItemHeight + 2, DraggableWindow.textSecondaryColor(), false);
                     idx++;
                     int rIdx = 0;
@@ -292,7 +296,8 @@ public class NotepadApp implements IApp {
         }
 
         // background for text area (use theme-aware color)
-        int textBg = DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFFFAFAFA;
+        // dark mode keeps the darker field; light mode uses 0xFFCCCCCC per request (main element)
+        int textBg = DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFF969696;
         guiGraphics.fill(cx, textY, cx + cw, textY + textHeight, textBg);
 
         textArea.setX(cx + 2); textArea.setY(textY + 2); textArea.setWidth(cw - 4); textArea.setHeight(textHeight - 4);
@@ -301,7 +306,8 @@ public class NotepadApp implements IApp {
         textArea.render(guiGraphics, (int)this.mouseRelX, (int)this.mouseRelY, partialTick);
 
         int statusY = textY + textHeight;
-        guiGraphics.fill(cx, statusY, cx + cw, statusY + 20, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFEEEEEE);
+        // make the status bar a bit darker than the main editor in light mode
+        guiGraphics.fill(cx, statusY, cx + cw, statusY + 20, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
         int[] lc = getCursorLineCol();
         String name = currentFile.get() != null ? currentFile.get().getName() : "Untitled";
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(name + (isModified.get() ? " *" : "") + "  |  Ln " + lc[0] + ", Col " + lc[1]), cx + 5, statusY + 5, DraggableWindow.textPrimaryColor(), false);
@@ -316,7 +322,8 @@ public class NotepadApp implements IApp {
         int w = 420, h = 140;
         int x = cx + (cw - w) / 2;
         int y = cy + (ch - h) / 2;
-        guiGraphics.fill(x, y, x + w, y + h, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFFFFFFF);
+        // Save dialog background: slightly darker in light mode than the main editor
+        guiGraphics.fill(x, y, x + w, y + h, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
         guiGraphics.fill(x, y, x + w, y + 20, DraggableWindow.accentColorARGB);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save Document"), x + 8, y + 6, DraggableWindow.textPrimaryColor(), false);
 
@@ -336,7 +343,8 @@ public class NotepadApp implements IApp {
         int w = 420, h = 140;
         int x = cx + (cw - w) / 2;
         int y = cy + (ch - h) / 2;
-        guiGraphics.fill(x, y, x + w, y + h, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFFFFFFF);
+        // Open dialog background: slightly darker in light mode
+        guiGraphics.fill(x, y, x + w, y + h, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
         guiGraphics.fill(x, y, x + w, y + 20, DraggableWindow.accentColorARGB);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Open Document"), x + 8, y + 6, DraggableWindow.textPrimaryColor(), false);
 
@@ -356,7 +364,7 @@ public class NotepadApp implements IApp {
         int w = 340, h = 100;
         int x = cx + (cw - w) / 2;
         int y = cy + (ch - h) / 2;
-        guiGraphics.fill(x, y, x + w, y + h, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFFFFFFF);
+        guiGraphics.fill(x, y, x + w, y + h, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save changes before exiting?"), x + 16, y + 18, DraggableWindow.textPrimaryColor(), false);
         guiGraphics.fill(x + 20, y + h - 36, x + 100, y + h - 12, 0xFF4CAF50);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save"), x + 36, y + h - 32, DraggableWindow.textPrimaryColor(), false);
@@ -664,8 +672,8 @@ public class NotepadApp implements IApp {
         }
 
         void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-            // background
-            g.fill(x, y, x + width, y + height, 0xFF000000);
+            // background: respect theme so light-mode shows 0xFFCCCCCC per user request
+            g.fill(x, y, x + width, y + height, DraggableWindow.darkTheme ? 0xFF000000 : 0xFFCCCCCC);
             java.util.List<String> lines = getLines();
             int lineH = font.lineHeight;
             int maxLines = Math.max(1, height / lineH);
@@ -687,9 +695,10 @@ public class NotepadApp implements IApp {
                 String curLine = lineIndex < lines.size() ? lines.get(lineIndex) : "";
                 int caretX = x + 4 + font.width(curLine.substring(0, Math.max(0, Math.min(col, curLine.length()))));
                 int caretY = y + 2 + lineIndex * lineH;
-                g.fill(caretX, caretY, caretX + 1, caretY + lineH - 2, 0xFFFFFFFF);
-            }
-        }
+                // Use theme-aware primary text color so the caret is visible on light backgrounds
+                g.fill(caretX, caretY, caretX + 1, caretY + lineH - 2, DraggableWindow.textPrimaryColor());
+             }
+         }
 
         boolean mouseClicked(double mx, double my, int button) {
             focused = (mx >= x && mx <= x + width && my >= y && my <= y + height);
