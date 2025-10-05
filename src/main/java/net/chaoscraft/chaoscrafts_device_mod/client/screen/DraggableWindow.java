@@ -39,6 +39,30 @@ public class DraggableWindow {
     public static boolean darkTheme = true;
     public static int accentColorARGB = 0xFF4C7BD1;
 
+    // Theme helper: primary text color appropriate for the current theme
+    public static int textPrimaryColor() {
+        return darkTheme ? 0xFFDDDDDD : 0xFF111111;
+    }
+
+    // Theme helper: secondary text color (subdued)
+    public static int textSecondaryColor() {
+        return darkTheme ? 0xFFBBBBBB : 0xFF333333;
+    }
+
+    // Theme helper: selection/overlay color (used for outlines/highlights)
+    public static int selectionOverlayColor() {
+        return darkTheme ? 0x66FFFFFF : 0x66000000;
+    }
+
+    // Public contrasting color helper (black on light BG, white on dark BG)
+    public static int contrastingColorFor(int backgroundColor) {
+        int r = (backgroundColor >> 16) & 0xFF;
+        int g = (backgroundColor >> 8) & 0xFF;
+        int b = backgroundColor & 0xFF;
+        double luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.5 ? 0xFF000000 : 0xFFFFFFFF;
+    }
+
     // Track all open windows so callers can close them en-masse
     private static final List<DraggableWindow> ALL_WINDOWS = new CopyOnWriteArrayList<>();
 
@@ -125,22 +149,22 @@ public class DraggableWindow {
         guiGraphics.fill(renderX, renderY, renderX + renderW, renderY + 26, titleColor);
 
         // title text (with contrast to accent color)
-        int textColor = getContrastingTextColor(accentColorARGB);
+        int textColor = contrastingColorFor(accentColorARGB);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(appName), renderX + 8, renderY + 6, textColor, false);
 
         // title buttons (close, minimize, maximize)
         int btnY = renderY + 6;
         // close (red)
         guiGraphics.fill(renderX + renderW - 20, btnY, renderX + renderW - 8, btnY + 14, 0xFFFF6666 | ((alpha << 24) & 0xFF000000));
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("X"), renderX + renderW - 19, btnY, 0xFFFFFFFF, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("X"), renderX + renderW - 19, btnY, contrastingColorFor(0xFFFF6666), false);
         // minimize (yellow)
         guiGraphics.fill(renderX + renderW - 44, btnY, renderX + renderW - 32, btnY + 14, 0xFFFFFF66 | ((alpha << 24) & 0xFF000000));
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("-"), renderX + renderW - 43, btnY, 0xFF000000, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("-"), renderX + renderW - 43, btnY, contrastingColorFor(0xFFFFFF66), false);
         // maximize (accent)
         int accent = accentColorARGB & 0x00FFFFFF;
         int accentWithAlpha = ((alpha << 24) | (accent & 0x00FFFFFF));
         guiGraphics.fill(renderX + renderW - 68, btnY, renderX + renderW - 56, btnY + 14, accentWithAlpha);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("▢"), renderX + renderW - 65, btnY, 0xFF000000, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("▢"), renderX + renderW - 65, btnY, contrastingColorFor(accentWithAlpha), false);
 
         // delegate rendering to app content
         if (app != null && !minimized) {
@@ -154,17 +178,9 @@ public class DraggableWindow {
     }
 
     // Helper method to determine contrasting text color
+    // (kept for backward compatibility internally)
     private int getContrastingTextColor(int backgroundColor) {
-        // Extract RGB components
-        int r = (backgroundColor >> 16) & 0xFF;
-        int g = (backgroundColor >> 8) & 0xFF;
-        int b = backgroundColor & 0xFF;
-
-        // Calculate relative luminance (perceived brightness)
-        double luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-
-        // Return white for dark backgrounds, black for light backgrounds
-        return luminance > 0.5 ? 0xFF000000 : 0xFFFFFFFF;
+        return contrastingColorFor(backgroundColor);
     }
 
     public int[] getRenderRect(int taskbarHeight) {

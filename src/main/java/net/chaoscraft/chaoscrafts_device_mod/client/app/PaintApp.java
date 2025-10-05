@@ -59,68 +59,68 @@ public class PaintApp implements IApp {
         int cw = r[2] - 16, ch = r[3] - 40;
 
         // Toolbar
-        guiGraphics.fill(cx, cy, cx + cw, cy + 36, 0xFF2B2B2B);
+        guiGraphics.fill(cx, cy, cx + cw, cy + 36, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFF0F0F0);
 
         // Clear button
-        guiGraphics.fill(cx + 6, cy + 6, cx + 56, cy + 26, 0xFF555555);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Clear"), cx + 12, cy + 10, 0xFFFFFFFF, false);
+        guiGraphics.fill(cx + 6, cy + 6, cx + 56, cy + 26, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Clear"), cx + 12, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
         // Save button
-        guiGraphics.fill(cx + 62, cy + 6, cx + 122, cy + 26, 0xFF555555);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save PNG"), cx + 68, cy + 10, 0xFFFFFFFF, false);
+        guiGraphics.fill(cx + 62, cy + 6, cx + 122, cy + 26, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save PNG"), cx + 68, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
         // Brush size indicator
-        guiGraphics.fill(cx + 128, cy + 6, cx + 148, cy + 26, 0xFF555555);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("" + brushSize), cx + 134, cy + 10, 0xFFFFFFFF, false);
+        guiGraphics.fill(cx + 128, cy + 6, cx + 148, cy + 26, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("" + brushSize), cx + 134, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
         // Brush size controls
-        guiGraphics.fill(cx + 154, cy + 6, cx + 174, cy + 20, 0xFF666666);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("+"), cx + 160, cy + 8, 0xFFFFFFFF, false);
+        guiGraphics.fill(cx + 154, cy + 6, cx + 174, cy + 20, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFBBBBBB);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("+"), cx + 160, cy + 8, DraggableWindow.textPrimaryColor(), false);
 
-        guiGraphics.fill(cx + 154, cy + 12, cx + 174, cy + 26, 0xFF666666);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("-"), cx + 160, cy + 14, 0xFFFFFFFF, false);
+        guiGraphics.fill(cx + 154, cy + 12, cx + 174, cy + 26, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFBBBBBB);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("-"), cx + 160, cy + 14, DraggableWindow.textPrimaryColor(), false);
 
         // Color palette
-        int paletteX = cx + 180;
-        for (int i = 0; i < palette.length; i++) {
-            int px = paletteX + i * 20;
+         int paletteX = cx + 180;
+         for (int i = 0; i < palette.length; i++) {
+             int px = paletteX + i * 20;
             guiGraphics.fill(px, cy + 6, px + 16, cy + 22, palette[i]);
-            if (palette[i] == currentColor) {
-                guiGraphics.fill(px - 1, cy + 5, px + 17, cy + 23, 0xFFFFFFFF);
+            if ((palette[i] & 0x00FFFFFF) == (currentColor & 0x00FFFFFF)) {
+                guiGraphics.fill(px - 1, cy + 5, px + 17, cy + 23, DraggableWindow.selectionOverlayColor());
             }
-        }
+         }
 
-        // Color picker button
-        int colorPickerBtnX = paletteX + palette.length * 20 + 10;
-        guiGraphics.fill(colorPickerBtnX, cy + 6, colorPickerBtnX + 80, cy + 26, 0xFF555555);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Colors"), colorPickerBtnX + 8, cy + 10, 0xFFFFFFFF, false);
+         // Color picker button
+         int colorPickerBtnX = paletteX + palette.length * 20 + 10;
+        guiGraphics.fill(colorPickerBtnX, cy + 6, colorPickerBtnX + 80, cy + 26, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Colors"), colorPickerBtnX + 8, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
-        // HEX color input
-        int hexInputX = colorPickerBtnX + 86;
-        hexColorInput.setX(hexInputX);
-        hexColorInput.setY(cy + 6);
-        hexColorInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
+         // HEX color input
+         int hexInputX = colorPickerBtnX + 86;
+         hexColorInput.setX(hexInputX);
+         hexColorInput.setY(cy + 6);
+         hexColorInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
 
-        // Current color preview
+         // Current color preview
         guiGraphics.fill(hexInputX + 86, cy + 6, hexInputX + 106, cy + 26, currentColor);
-        guiGraphics.fill(hexInputX + 85, cy + 5, hexInputX + 107, cy + 27, 0xFF666666);
+        guiGraphics.fill(hexInputX + 85, cy + 5, hexInputX + 107, cy + 27, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFCCCCCC);
 
-        // Color picker dialog
-        if (colorPickerOpen) {
-            renderColorPicker(guiGraphics, cx, cy, cw, ch);
-        }
+         // Color picker dialog
+         if (colorPickerOpen) {
+             renderColorPicker(guiGraphics, cx, cy, cw, ch);
+         }
 
-        // Canvas area
-        int canvasX = cx, canvasY = cy + 36;
-        int canvasW = cw, canvasH = ch - 36;
-        guiGraphics.fill(canvasX, canvasY, canvasX + canvasW, canvasY + canvasH, 0xFFFFFFFF);
-
+         // Canvas area
+         int canvasX = cx, canvasY = cy + 36;
+         int canvasW = cw, canvasH = ch - 36;
+        guiGraphics.fill(canvasX, canvasY, canvasX + canvasW, canvasY + canvasH, DraggableWindow.darkTheme ? 0xFF0F0F0F : 0xFFFFFFFF);
         // Draw grid for better visibility
+        int gridColor = DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFEEEEEE;
         for (int x = canvasX; x <= canvasX + canvasW; x += 10) {
-            guiGraphics.fill(x, canvasY, x + 1, canvasY + canvasH, 0xFFEEEEEE);
+            guiGraphics.fill(x, canvasY, x + 1, canvasY + canvasH, gridColor);
         }
         for (int y = canvasY; y <= canvasY + canvasH; y += 10) {
-            guiGraphics.fill(canvasX, y, canvasX + canvasW, y + 1, 0xFFEEEEEE);
+            guiGraphics.fill(canvasX, y, canvasX + canvasW, y + 1, gridColor);
         }
 
         // Draw all strokes
@@ -141,8 +141,8 @@ public class PaintApp implements IApp {
         int pickerH = 200;
 
         // Color picker background
-        guiGraphics.fill(pickerX, pickerY, pickerX + pickerW, pickerY + pickerH, 0xFF333333);
-        guiGraphics.fill(pickerX - 1, pickerY - 1, pickerX + pickerW + 1, pickerY + pickerH + 1, 0xFF666666);
+        guiGraphics.fill(pickerX, pickerY, pickerX + pickerW, pickerY + pickerH, DraggableWindow.darkTheme ? 0xFF333333 : 0xFFFFFFFF);
+        guiGraphics.fill(pickerX - 1, pickerY - 1, pickerX + pickerW + 1, pickerY + pickerH + 1, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFCCCCCC);
 
         // Hue slider (vertical)
         int hueX = pickerX + pickerW - 20;
@@ -158,7 +158,7 @@ public class PaintApp implements IApp {
 
         // Hue selector
         int hueSelectorY = hueY + (int) (hue / 360f * hueH);
-        guiGraphics.fill(hueX - 2, hueSelectorY - 2, hueX + 17, hueSelectorY + 2, 0xFFFFFFFF);
+        guiGraphics.fill(hueX - 2, hueSelectorY - 2, hueX + 17, hueSelectorY + 2, DraggableWindow.selectionOverlayColor());
 
         // Saturation-Value box
         int svX = pickerX + 10;
@@ -178,14 +178,14 @@ public class PaintApp implements IApp {
         // SV selector
         int svSelectorX = svX + (int) (saturation * svSize);
         int svSelectorY = svY + (int) ((1f - value) * svSize);
-        guiGraphics.fill(svSelectorX - 2, svSelectorY - 2, svSelectorX + 2, svSelectorY + 2, 0xFFFFFFFF);
+        guiGraphics.fill(svSelectorX - 2, svSelectorY - 2, svSelectorX + 2, svSelectorY + 2, DraggableWindow.selectionOverlayColor());
 
         // Current color preview
         guiGraphics.fill(pickerX + 10, pickerY + pickerH - 25, pickerX + 40, pickerY + pickerH - 5, currentColor);
 
         // OK button
-        guiGraphics.fill(pickerX + pickerW - 50, pickerY + pickerH - 25, pickerX + pickerW - 10, pickerY + pickerH - 5, 0xFF555555);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("OK"), pickerX + pickerW - 40, pickerY + pickerH - 20, 0xFFFFFFFF, false);
+        guiGraphics.fill(pickerX + pickerW - 50, pickerY + pickerH - 25, pickerX + pickerW - 10, pickerY + pickerH - 5, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("OK"), pickerX + pickerW - 40, pickerY + pickerH - 20, DraggableWindow.textPrimaryColor(), false);
     }
 
     private int hsvToRgb(float h, float s, float v) {
@@ -583,3 +583,4 @@ public class PaintApp implements IApp {
         }
     }
 }
+

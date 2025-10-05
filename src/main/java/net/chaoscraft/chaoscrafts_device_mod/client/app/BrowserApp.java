@@ -35,8 +35,8 @@ public class BrowserApp implements IApp {
     public void renderContent(GuiGraphics guiGraphics, PoseStack poseStack, DraggableWindow window, int mouseRelX, int mouseRelY, float partialTick) {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16;
-        guiGraphics.fill(cx, cy, cx + cw, cy + 30, 0xFF2B2B2B);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Address:"), cx + 6, cy + 8, 0xFFFFFFFF, false);
+        guiGraphics.fill(cx, cy, cx + cw, cy + 30, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFF0F0F0);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Address:"), cx + 6, cy + 8, DraggableWindow.textPrimaryColor(), false);
         if (addressBox == null) addressBox = new EditBox(Minecraft.getInstance().font, cx + 64, cy + 6, Math.max(80, cw - 160), 16, Component.literal("url"));
         // set position every frame so internal layout matches
         addressBox.setX(cx + 64);
@@ -45,11 +45,11 @@ public class BrowserApp implements IApp {
         addressBox.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
 
         // "Go" button
-        guiGraphics.fill(cx + cw - 86, cy + 6, cx + cw - 66, cy + 22, 0xFF666666);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Go"), cx + cw - 82, cy + 8, 0xFFFFFFFF, false);
+        guiGraphics.fill(cx + cw - 86, cy + 6, cx + cw - 66, cy + 22, DraggableWindow.darkTheme ? 0xFF666666 : 0xFF999999);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Go"), cx + cw - 82, cy + 8, DraggableWindow.textPrimaryColor(), false);
 
         // content display
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(content), cx + 6, cy + 40, 0xFFFFFFFF, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(content), cx + 6, cy + 40, DraggableWindow.textPrimaryColor(), false);
     }
 
     @Override

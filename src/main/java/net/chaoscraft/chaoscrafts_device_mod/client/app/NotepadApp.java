@@ -248,41 +248,41 @@ public class NotepadApp implements IApp {
 
         // Menu bar
         if (showMenuBar) {
-            guiGraphics.fill(cx, cy, cx + cw, cy + 24, 0xFF2B2B2B);
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("File"), cx + 8, cy + 6, 0xFFFFFFFF, false);
+            guiGraphics.fill(cx, cy, cx + cw, cy + 24, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFF0F0F0);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("File"), cx + 8, cy + 6, DraggableWindow.textPrimaryColor(), false);
             // Save button in the menu bar for quick access
             int saveBtnX = cx + 64;
             int saveBtnY = cy + 3;
             int saveBtnW = 52;
             int saveBtnH = 18;
             guiGraphics.fill(saveBtnX, saveBtnY, saveBtnX + saveBtnW, saveBtnY + saveBtnH, 0xFF4CAF50);
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save"), saveBtnX + 10, saveBtnY + 4, 0xFFFFFFFF, false);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save"), saveBtnX + 10, saveBtnY + 4, DraggableWindow.textPrimaryColor(), false);
             // File menu dropdown
             if (fileMenuOpen) {
                 int mx = cx + 8, my = cy + 24;
                 int menuH = fileMenuItemHeight * (fileMenuItems.length + Math.min(5, recentFiles.size()));
-                guiGraphics.fill(mx, my, mx + fileMenuWidth, my + menuH, 0xFF444444);
+                guiGraphics.fill(mx, my, mx + fileMenuWidth, my + menuH, DraggableWindow.darkTheme ? 0xFF444444 : 0xFFFFFFFF);
                 int idx = 0;
                 for (String item : fileMenuItems) {
                     if (item.equals("-")) {
-                        guiGraphics.fill(mx, my + idx * fileMenuItemHeight, mx + fileMenuWidth, my + (idx + 1) * fileMenuItemHeight, 0xFF222222);
+                        guiGraphics.fill(mx, my + idx * fileMenuItemHeight, mx + fileMenuWidth, my + (idx + 1) * fileMenuItemHeight, DraggableWindow.darkTheme ? 0xFF222222 : 0xFFEFEFEF);
                     } else {
-                        int bg = (fileMenuSelected == idx) ? 0xFF6666AA : 0x00000000;
+                        int bg = (fileMenuSelected == idx) ? (DraggableWindow.darkTheme ? 0xFF6666AA : 0xFFDDDDEE) : 0x00000000;
                         guiGraphics.fill(mx, my + idx * fileMenuItemHeight, mx + fileMenuWidth, my + (idx + 1) * fileMenuItemHeight, bg);
-                        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(item), mx + 8, my + idx * fileMenuItemHeight + 4, 0xFFFFFFFF, false);
+                        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(item), mx + 8, my + idx * fileMenuItemHeight + 4, DraggableWindow.textPrimaryColor(), false);
                     }
                     idx++;
                 }
                 // Recent files
                 if (!recentFiles.isEmpty()) {
-                    guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Recent files:"), mx + 8, my + idx * fileMenuItemHeight + 2, 0xFFAAAAAA, false);
+                    guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Recent files:"), mx + 8, my + idx * fileMenuItemHeight + 2, DraggableWindow.textSecondaryColor(), false);
                     idx++;
                     int rIdx = 0;
                     for (String rf : recentFiles) {
-                        int bg = (fileMenuSelected == idx) ? 0xFF6666AA : 0x00000000;
+                        int bg = (fileMenuSelected == idx) ? (DraggableWindow.darkTheme ? 0xFF6666AA : 0xFFDDDDEE) : 0x00000000;
                         guiGraphics.fill(mx, my + idx * fileMenuItemHeight, mx + fileMenuWidth, my + (idx + 1) * fileMenuItemHeight, bg);
                         String shortName = new File(rf).getName();
-                        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(shortName), mx + 16, my + idx * fileMenuItemHeight + 4, 0xFFFFFFFF, false);
+                        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(shortName), mx + 16, my + idx * fileMenuItemHeight + 4, DraggableWindow.textPrimaryColor(), false);
                         idx++;
                         rIdx++;
                         if (rIdx >= 5) break;
@@ -292,20 +292,20 @@ public class NotepadApp implements IApp {
         }
 
         // background for text area (use theme-aware color)
-        int textBg = DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFFEEEEEE;
+        int textBg = DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFFFAFAFA;
         guiGraphics.fill(cx, textY, cx + cw, textY + textHeight, textBg);
 
         textArea.setX(cx + 2); textArea.setY(textY + 2); textArea.setWidth(cw - 4); textArea.setHeight(textHeight - 4);
-        int textColor = DraggableWindow.darkTheme ? 0xFFFFFFFF : 0xFF000000;
+        int textColor = DraggableWindow.textPrimaryColor();
         textArea.setTextColor(textColor);
         textArea.render(guiGraphics, (int)this.mouseRelX, (int)this.mouseRelY, partialTick);
 
         int statusY = textY + textHeight;
-        guiGraphics.fill(cx, statusY, cx + cw, statusY + 20, 0xFF2B2B2B);
+        guiGraphics.fill(cx, statusY, cx + cw, statusY + 20, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFEEEEEE);
         int[] lc = getCursorLineCol();
         String name = currentFile.get() != null ? currentFile.get().getName() : "Untitled";
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(name + (isModified.get() ? " *" : "") + "  |  Ln " + lc[0] + ", Col " + lc[1]), cx + 5, statusY + 5, 0xFFFFFFFF, false);
-        if (System.currentTimeMillis() - statusMessageTime < 3000) guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(statusMessage), cx + cw - 10 - Minecraft.getInstance().font.width(statusMessage), statusY + 5, 0xFFFFFFFF, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(name + (isModified.get() ? " *" : "") + "  |  Ln " + lc[0] + ", Col " + lc[1]), cx + 5, statusY + 5, DraggableWindow.textPrimaryColor(), false);
+        if (System.currentTimeMillis() - statusMessageTime < 3000) guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(statusMessage), cx + cw - 10 - Minecraft.getInstance().font.width(statusMessage), statusY + 5, DraggableWindow.textPrimaryColor(), false);
 
         if (showSaveDialog) renderSaveDialog(guiGraphics, cx, cy, cw, ch);
         if (showOpenDialog) renderOpenDialog(guiGraphics, cx, cy, cw, ch);
@@ -316,54 +316,54 @@ public class NotepadApp implements IApp {
         int w = 420, h = 140;
         int x = cx + (cw - w) / 2;
         int y = cy + (ch - h) / 2;
-        guiGraphics.fill(x, y, x + w, y + h, 0xFF2B2B2B);
-        guiGraphics.fill(x, y, x + w, y + 20, 0xFF4C7BD1);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save Document"), x + 8, y + 6, 0xFFFFFFFF, false);
+        guiGraphics.fill(x, y, x + w, y + h, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFFFFFFF);
+        guiGraphics.fill(x, y, x + w, y + 20, DraggableWindow.accentColorARGB);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save Document"), x + 8, y + 6, DraggableWindow.textPrimaryColor(), false);
 
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("File name:"), x + 8, y + 34, 0xFFFFFFFF, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("File name:"), x + 8, y + 34, DraggableWindow.textPrimaryColor(), false);
         saveFileNameInput.setX(x + 100); saveFileNameInput.setY(y + 32); saveFileNameInput.setWidth(w - 210); saveFileNameInput.render(guiGraphics, (int)mouseRelX, (int)mouseRelY, 0);
 
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save in:"), x + 8, y + 62, 0xFFFFFFFF, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save in:"), x + 8, y + 62, DraggableWindow.textPrimaryColor(), false);
         filePathInput.setX(x + 100); filePathInput.setY(y + 60); filePathInput.setWidth(w - 210); filePathInput.render(guiGraphics, (int)mouseRelX, (int)mouseRelY, 0);
 
-        guiGraphics.fill(x + w - 170, y + h - 36, x + w - 110, y + h - 12, 0xFF888888);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Cancel"), x + w - 158, y + h - 32, 0xFFFFFFFF, false);
+        guiGraphics.fill(x + w - 170, y + h - 36, x + w - 110, y + h - 12, DraggableWindow.darkTheme ? 0xFF888888 : 0xFFCCCCCC);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Cancel"), x + w - 158, y + h - 32, DraggableWindow.textPrimaryColor(), false);
         guiGraphics.fill(x + w - 100, y + h - 36, x + w - 40, y + h - 12, 0xFF4CAF50);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save"), x + w - 90, y + h - 32, 0xFFFFFFFF, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save"), x + w - 90, y + h - 32, DraggableWindow.textPrimaryColor(), false);
     }
 
     private void renderOpenDialog(GuiGraphics guiGraphics, int cx, int cy, int cw, int ch) {
         int w = 420, h = 140;
         int x = cx + (cw - w) / 2;
         int y = cy + (ch - h) / 2;
-        guiGraphics.fill(x, y, x + w, y + h, 0xFF2B2B2B);
-        guiGraphics.fill(x, y, x + w, y + 20, 0xFF4C7BD1);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Open Document"), x + 8, y + 6, 0xFFFFFFFF, false);
+        guiGraphics.fill(x, y, x + w, y + h, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFFFFFFF);
+        guiGraphics.fill(x, y, x + w, y + 20, DraggableWindow.accentColorARGB);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Open Document"), x + 8, y + 6, DraggableWindow.textPrimaryColor(), false);
 
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("File name:"), x + 8, y + 34, 0xFFFFFFFF, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("File name:"), x + 8, y + 34, DraggableWindow.textPrimaryColor(), false);
         openFileNameInput.setX(x + 100); openFileNameInput.setY(y + 32); openFileNameInput.setWidth(w - 210); openFileNameInput.render(guiGraphics, (int)mouseRelX, (int)mouseRelY, 0);
 
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Open from:"), x + 8, y + 62, 0xFFFFFFFF, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Open from:"), x + 8, y + 62, DraggableWindow.textPrimaryColor(), false);
         openFilePathInput.setX(x + 100); openFilePathInput.setY(y + 60); openFilePathInput.setWidth(w - 210); openFilePathInput.render(guiGraphics, (int)mouseRelX, (int)mouseRelY, 0);
 
-        guiGraphics.fill(x + w - 170, y + h - 36, x + w - 110, y + h - 12, 0xFF888888);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Cancel"), x + w - 158, y + h - 32, 0xFFFFFFFF, false);
+        guiGraphics.fill(x + w - 170, y + h - 36, x + w - 110, y + h - 12, DraggableWindow.darkTheme ? 0xFF888888 : 0xFFCCCCCC);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Cancel"), x + w - 158, y + h - 32, DraggableWindow.textPrimaryColor(), false);
         guiGraphics.fill(x + w - 100, y + h - 36, x + w - 40, y + h - 12, 0xFF4CAF50);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Open"), x + w - 90, y + h - 32, 0xFFFFFFFF, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Open"), x + w - 90, y + h - 32, DraggableWindow.textPrimaryColor(), false);
     }
 
     private void renderSaveOnExitDialog(GuiGraphics guiGraphics, int cx, int cy, int cw, int ch) {
         int w = 340, h = 100;
         int x = cx + (cw - w) / 2;
         int y = cy + (ch - h) / 2;
-        guiGraphics.fill(x, y, x + w, y + h, 0xFF2B2B2B);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save changes before exiting?"), x + 16, y + 18, 0xFFFFFFFF, false);
+        guiGraphics.fill(x, y, x + w, y + h, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFFFFFFF);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save changes before exiting?"), x + 16, y + 18, DraggableWindow.textPrimaryColor(), false);
         guiGraphics.fill(x + 20, y + h - 36, x + 100, y + h - 12, 0xFF4CAF50);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save"), x + 36, y + h - 32, 0xFFFFFFFF, false);
-        guiGraphics.fill(x + 120, y + h - 36, x + 200, y + h - 12, 0xFF888888);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Don't Save"), x + 126, y + h - 32, 0xFFFFFFFF, false);
-        guiGraphics.fill(x + 220, y + h - 36, x + 300, y + h - 12, 0xFF888888);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Cancel"), x + 236, y + h - 32, 0xFFFFFFFF, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save"), x + 36, y + h - 32, DraggableWindow.textPrimaryColor(), false);
+        guiGraphics.fill(x + 120, y + h - 36, x + 200, y + h - 12, DraggableWindow.darkTheme ? 0xFF888888 : 0xFFCCCCCC);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Don't Save"), x + 126, y + h - 32, DraggableWindow.textPrimaryColor(), false);
+        guiGraphics.fill(x + 220, y + h - 36, x + 300, y + h - 12, DraggableWindow.darkTheme ? 0xFF888888 : 0xFFCCCCCC);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Cancel"), x + 236, y + h - 32, DraggableWindow.textPrimaryColor(), false);
     }
 
     @Override

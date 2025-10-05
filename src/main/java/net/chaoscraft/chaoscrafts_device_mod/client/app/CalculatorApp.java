@@ -24,8 +24,8 @@ public class CalculatorApp implements IApp {
     public void renderContent(GuiGraphics guiGraphics, PoseStack poseStack, DraggableWindow window, int mouseRelX, int mouseRelY, float partialTick) {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16;
-        guiGraphics.fill(cx, cy, cx + cw, cy + 60, 0xFF1E1E1E);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(display), cx + 8, cy + 18, 0xFFFFFFFF, false);
+        guiGraphics.fill(cx, cy, cx + cw, cy + 60, DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFFF8F8F8);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(display), cx + 8, cy + 18, DraggableWindow.textPrimaryColor(), false);
         String[][] grid = {{"7","8","9","/"},{"4","5","6","*"},{"1","2","3","-"},{"0",".","=","+"}};
         int bw = Math.min(60, (cw - 24)/4);
         int by = cy + 70;
@@ -34,8 +34,8 @@ public class CalculatorApp implements IApp {
                 String lab = grid[rrow][ccol];
                 int bx = cx + ccol*(bw+6);
                 int byy = by + rrow*(32);
-                guiGraphics.fill(bx, byy, bx + bw, byy + 28, 0xFF444444);
-                guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(lab), bx + 10, byy + 6, 0xFFFFFFFF, false);
+                guiGraphics.fill(bx, byy, bx + bw, byy + 28, DraggableWindow.darkTheme ? 0xFF444444 : 0xFFCCCCCC);
+                guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(lab), bx + 10, byy + 6, DraggableWindow.textPrimaryColor(), false);
             }
         }
     }

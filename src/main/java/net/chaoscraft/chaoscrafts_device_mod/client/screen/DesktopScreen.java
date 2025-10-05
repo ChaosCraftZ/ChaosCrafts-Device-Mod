@@ -250,15 +250,15 @@ public class DesktopScreen extends Screen {
             guiGraphics.pose().scale(titleScale, titleScale, 1f);
             int scaledX = (int)((w / titleScale - tw) / 2f);
             int scaledY = (int)((centerY - 60) / titleScale);
-            guiGraphics.drawString(font, Component.literal(title), scaledX + 1, scaledY + 1, 0x66000000, false);
-            guiGraphics.drawString(font, Component.literal(title), scaledX, scaledY, 0xFFFFFFFF, false);
+            guiGraphics.drawString(font, Component.literal(title), scaledX + 1, scaledY + 1, DraggableWindow.darkTheme ? 0x66000000 : 0x66FFFFFF, false);
+            guiGraphics.drawString(font, Component.literal(title), scaledX, scaledY, DraggableWindow.textPrimaryColor(), false);
             guiGraphics.pose().popPose();
 
             // subtitle under title
             String baseSub = "Loading apps & settings";
             int dots = (int) ((elapsed / 450) % 4);
             String sub = baseSub + ".".repeat(Math.max(0, dots));
-            guiGraphics.drawString(font, Component.literal(sub), (w - font.width(sub)) / 2, centerY - 24, 0xFFBFC9D3, false);
+            guiGraphics.drawString(font, Component.literal(sub), (w - font.width(sub)) / 2, centerY - 24, DraggableWindow.textSecondaryColor(), false);
 
             // Progress bar (centered around centerY)
             float targetProg = Math.min(1f, (float) elapsed / (float) MIN_LOADING_MS);
@@ -266,8 +266,8 @@ public class DesktopScreen extends Screen {
             int barW = Math.min(600, w - 160);
             int bx = (w - barW) / 2; int by = centerY + 4;
             int barH = 12;
-            guiGraphics.fill(bx - 3, by - 3, bx + barW + 3, by + barH + 3, 0x44707070);
-            guiGraphics.fill(bx, by, bx + barW, by + barH, 0xFF1F2428);
+            guiGraphics.fill(bx - 3, by - 3, bx + barW + 3, by + barH + 3, DraggableWindow.darkTheme ? 0x44707070 : 0x44BBBBBB);
+            guiGraphics.fill(bx, by, bx + barW, by + barH, DraggableWindow.darkTheme ? 0xFF1F2428 : 0xFFF0F0F0);
             int filled = bx + Math.round(barW * currentLoadingProgress);
             guiGraphics.fill(bx, by, filled, by + barH, DraggableWindow.accentColorARGB);
             guiGraphics.fill(Math.max(bx, filled - 6), by, Math.min(bx + barW, filled + 6), by + barH, (DraggableWindow.accentColorARGB & 0x00FFFFFF) | 0x33FFFFFF);
@@ -276,7 +276,7 @@ public class DesktopScreen extends Screen {
             String pct = String.format("%d%%", Math.round(currentLoadingProgress * 100f));
             int pctX = bx + (barW - font.width(pct)) / 2;
             int pctY = by + Math.max(0, (barH - 8) / 2);
-            guiGraphics.drawString(font, Component.literal(pct), pctX, pctY, 0xFFDDE6EB, false);
+            guiGraphics.drawString(font, Component.literal(pct), pctX, pctY, DraggableWindow.textPrimaryColor(), false);
 
             // Particles (more varied and softer), spawn around the centered group
             synchronized (loadingParticles) {
@@ -309,7 +309,7 @@ public class DesktopScreen extends Screen {
 
             // Small footer hint
             String hint = "Press ESC to close";
-            guiGraphics.drawString(font, Component.literal(hint), w - font.width(hint) - 10, h - 24, 0x66FFFFFF, false);
+            guiGraphics.drawString(font, Component.literal(hint), w - font.width(hint) - 10, h - 24, DraggableWindow.darkTheme ? 0x66FFFFFF : 0x66000000, false);
 
             // Keep overlay for minimum time
             return;
@@ -319,9 +319,9 @@ public class DesktopScreen extends Screen {
         if (selecting && !iconDragging) {
             int x0 = Math.min(selectStartX, selectEndX), y0 = Math.min(selectStartY, selectEndY);
             int x1 = Math.max(selectStartX, selectEndX), y1 = Math.max(selectStartY, selectEndY);
-            int fillCol = ((DraggableWindow.accentColorARGB & 0x00FFFFFF) | 0x220000FF);
+            int fillCol = ((DraggableWindow.accentColorARGB & 0x00FFFFFF) | (DraggableWindow.darkTheme ? 0x220000FF : 0x22FFFFFF));
             guiGraphics.fill(x0, y0, x1, y1, fillCol);
-            int outline = 0x88AAD8FF;
+            int outline = DraggableWindow.darkTheme ? 0x88AAD8FF : 0x88000000;
             guiGraphics.fill(x0, y0, x1, y0 + 1, outline);
             guiGraphics.fill(x0, y1 - 1, x1, y1, outline);
             guiGraphics.fill(x0, y0, x0 + 1, y1, outline);
@@ -344,7 +344,7 @@ public class DesktopScreen extends Screen {
             int topSheen = 0x22FFFFFF;
             guiGraphics.fill(0, tbY, width, height, taskbarBase);
             // subtle top sheen strip
-            guiGraphics.fill(0, tbY, width, tbY + 3, topSheen);
+            guiGraphics.fill(0, tbY, width, tbY + 3, DraggableWindow.darkTheme ? topSheen : 0x22FFFFFF);
             // soft shadow above the bar
             guiGraphics.fill(0, tbY - 2, width, tbY, 0x22000000);
 
@@ -374,7 +374,7 @@ public class DesktopScreen extends Screen {
                 int lw = font.width(lbl);
                 int lx = x + Math.max(4, (trayIconW - lw) / 2);
                 int ly = iconY + Math.max(1, (trayIconH - 8) / 2);
-                guiGraphics.drawString(font, Component.literal(lbl), lx, ly, 0xFFFFFFFF, false);
+                guiGraphics.drawString(font, Component.literal(lbl), lx, ly, DraggableWindow.textPrimaryColor(), false);
                 x += trayIconW + trayIconPad;
             }
 
@@ -384,8 +384,8 @@ public class DesktopScreen extends Screen {
             if (clockLeft < minClockLeft) clockLeft = minClockLeft;
             int timeY = tbY + Math.max(2, (taskbarHeight - (font.lineHeight * 2)) / 2);
             int dateY = timeY + Math.max(6, font.lineHeight - 2);
-            guiGraphics.drawString(font, Component.literal(timeStr), clockLeft, timeY, 0xFFFFFFFF, false);
-            guiGraphics.drawString(font, Component.literal(dateStr), clockLeft, dateY, 0xFFCCCCCC, false);
+            guiGraphics.drawString(font, Component.literal(timeStr), clockLeft, timeY, DraggableWindow.textPrimaryColor(), false);
+            guiGraphics.drawString(font, Component.literal(dateStr), clockLeft, dateY, DraggableWindow.textSecondaryColor(), false);
 
             // render the search box on top so it is visible and receives input reliably
             try { searchBox.render(guiGraphics, mouseX, mouseY, partialTick); } catch (Exception ignored) {}
@@ -398,15 +398,15 @@ public class DesktopScreen extends Screen {
                 int popupX = searchBox.getX();
                 int popupY = tbY - popupH - 6; if (popupY < 6) popupY = 6;
 
-                guiGraphics.fill(popupX - 4, popupY - 4, popupX + popupW + 4, popupY + popupH + 4, 0xEE111111);
-                guiGraphics.fill(popupX - 3, popupY - 3, popupX + popupW + 3, popupY + popupH + 3, 0xCC1F1F1F);
+                guiGraphics.fill(popupX - 4, popupY - 4, popupX + popupW + 4, popupY + popupH + 4, DraggableWindow.darkTheme ? 0xEE111111 : 0xEEFFFFFF);
+                guiGraphics.fill(popupX - 3, popupY - 3, popupX + popupW + 3, popupY + popupH + 3, DraggableWindow.darkTheme ? 0xCC1F1F1F : 0xCCDDDDDD);
 
                 for (int i = 0; i < entries; i++) {
                     SearchResult r = searchResults.get(i);
                     int ry = popupY + 6 + i * RESULT_HEIGHT;
                     int rw = popupW - 12;
                     boolean hovered = mouseX >= popupX + 6 && mouseX <= popupX + 6 + rw && mouseY >= ry && mouseY <= ry + RESULT_HEIGHT;
-                    if (hovered) guiGraphics.fill(popupX + 6, ry, popupX + 6 + rw, ry + RESULT_HEIGHT, 0x33FFFFFF);
+                    if (hovered) guiGraphics.fill(popupX + 6, ry, popupX + 6 + rw, ry + RESULT_HEIGHT, DraggableWindow.selectionOverlayColor());
                     int iconSizePx = 20;
                     int iconX = popupX + 10;
                     if (r.iconRes != null) {
@@ -416,7 +416,7 @@ public class DesktopScreen extends Screen {
                     int textX = popupX + 12 + iconSizePx + 6;
                     int availTextW = popupW - (textX - popupX) - 12;
                     if (font.width(label) > availTextW) label = font.plainSubstrByWidth(label, availTextW - 8) + "...";
-                    guiGraphics.drawString(font, Component.literal(label), textX, ry + 6, 0xFFFFFFFF, false);
+                    guiGraphics.drawString(font, Component.literal(label), textX, ry + 6, DraggableWindow.textPrimaryColor(), false);
                 }
             }
 
@@ -440,7 +440,7 @@ public class DesktopScreen extends Screen {
                 boolean hovered = (mouseX >= x0 && mouseX <= x1 && mouseY >= y0 && mouseY <= y1);
                 int cx = tx + perEntry / 2 - 6;
                 int cy = tbY + taskbarHeight / 2 - 1;
-                if (hovered) guiGraphics.fill(x0, y0, x1, y1, 0x33FFFFFF);
+                if (hovered) guiGraphics.fill(x0, y0, x1, y1, DraggableWindow.selectionOverlayColor());
                 w.preview = hovered;
                 int tbIconSize = Math.min(24, perEntry - 28);
                 try {
@@ -450,7 +450,7 @@ public class DesktopScreen extends Screen {
                     }
                 } catch (Exception ignored) {}
 
-                if (w.minimized) guiGraphics.fill(cx - 3, tbY + taskbarHeight - 8, cx + 3, tbY + taskbarHeight - 6, 0xFFBBBBBB);
+                if (w.minimized) guiGraphics.fill(cx - 3, tbY + taskbarHeight - 8, cx + 3, tbY + taskbarHeight - 6, DraggableWindow.textSecondaryColor());
 
                 // hover tooltip for app name
                 if (hovered) {
@@ -458,8 +458,8 @@ public class DesktopScreen extends Screen {
                     int nw = font.width(name) + 8;
                     int nx = Math.max(6, Math.min(width - nw - 6, cx - nw / 2));
                     int ny = tbY - 22;
-                    guiGraphics.fill(nx, ny, nx + nw, ny + 16, 0xEE222222);
-                    guiGraphics.drawString(font, Component.literal(name), nx + 4, ny + 3, 0xFFFFFFFF, false);
+                    guiGraphics.fill(nx, ny, nx + nw, ny + 16, DraggableWindow.darkTheme ? 0xEE222222 : 0xEEFFFFFF);
+                    guiGraphics.drawString(font, Component.literal(name), nx + 4, ny + 3, DraggableWindow.textPrimaryColor(), false);
                 }
 
                 tx += perEntry;
@@ -841,10 +841,10 @@ public class DesktopScreen extends Screen {
             String key = name.contains(".") ? null : normalizeAppNameForIcon(name);
             ResourceLocation iconRes = IconManager.getIconResource(key);
             try { g.blit(iconRes, dx + 2, dy + 2, 0, 0, iconSize - 4, iconSize - 4, iconSize - 4, iconSize - 4); } catch (Exception ignored) {}
-            if (hover) g.fill(dx - 2, dy - 2, dx + iconSize + 2, dy + iconSize + 2, 0x22FFFFFF);
+            if (hover) g.fill(dx - 2, dy - 2, dx + iconSize + 2, dy + iconSize + 2, DraggableWindow.selectionOverlayColor());
             String displayName = toTitleCase(name);
             if (Minecraft.getInstance().font.width(displayName) > iconSize + 10) displayName = Minecraft.getInstance().font.plainSubstrByWidth(displayName, iconSize + 5) + "...";
-            g.drawString(Minecraft.getInstance().font, Component.literal(displayName), dx, dy + iconSize + 4, 0xFFFFFFFF, false);
+            g.drawString(Minecraft.getInstance().font, Component.literal(displayName), dx, dy + iconSize + 4, DraggableWindow.textPrimaryColor(), false);
         }
         boolean isInside(double mouseX, double mouseY, int currentIconSize) { return mouseX >= displayX && mouseX <= displayX + currentIconSize && mouseY >= displayY && mouseY <= displayY + currentIconSize; }
     }

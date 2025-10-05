@@ -212,7 +212,7 @@ public class SettingsApp implements IApp {
         guiGraphics.fill(cx, cy, cx + sidebarW, cy + 220, DraggableWindow.darkTheme ? 0xFF1A1A1A : 0xFFEFEFEF);
         for (int i = 0; i < categories.length; i++) {
             int itemY = cy + 8 + i * 34;
-            int textColor = (i == selectedCategoryIndex) ? DraggableWindow.accentColorARGB : (DraggableWindow.darkTheme ? 0xFFDDDDDD : 0xFF333333);
+            int textColor = (i == selectedCategoryIndex) ? DraggableWindow.accentColorARGB : DraggableWindow.textSecondaryColor();
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(categories[i]), cx + 12, itemY, textColor, false);
         }
 
@@ -222,21 +222,21 @@ public class SettingsApp implements IApp {
 
         // Render based on selected category
         String cat = categories[selectedCategoryIndex];
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(cat), mainX + 8, cy + 6, 0xFFFFFFFF, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(cat), mainX + 8, cy + 6, DraggableWindow.textPrimaryColor(), false);
 
         if ("Accessibility".equals(cat)) {
             int by = cy + 28;
             // Dark Mode toggle
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Dark Mode"), mainX + 8, by + 6, 0xFFFFFFFF, false);
-            int toggleX = mainX + 150, toggleY = by + 2, toggleW = 40, toggleH = 16;
-            int toggleBg = DraggableWindow.darkTheme ? DraggableWindow.accentColorARGB : 0xFF777777;
-            guiGraphics.fill(toggleX, toggleY, toggleX + toggleW, toggleY + toggleH, toggleBg);
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(DraggableWindow.darkTheme ? "On" : "Off"), toggleX + 6, toggleY + 2, 0xFF000000, false);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Dark Mode"), mainX + 8, by + 6, DraggableWindow.textPrimaryColor(), false);
+             int toggleX = mainX + 150, toggleY = by + 2, toggleW = 40, toggleH = 16;
+             int toggleBg = DraggableWindow.darkTheme ? DraggableWindow.accentColorARGB : 0xFF777777;
+             guiGraphics.fill(toggleX, toggleY, toggleX + toggleW, toggleY + toggleH, toggleBg);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(DraggableWindow.darkTheme ? "On" : "Off"), toggleX + 6, toggleY + 2, DraggableWindow.contrastingColorFor(toggleBg), false);
 
             // Accent color input + palette
             int accentY = by + 34;
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Accent Color"), mainX + 8, accentY, 0xFFFFFFFF, false);
-            accentColorInput.setX(mainX + 8); accentColorInput.setY(accentY + 14); accentColorInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Accent Color"), mainX + 8, accentY, DraggableWindow.textPrimaryColor(), false);
+             accentColorInput.setX(mainX + 8); accentColorInput.setY(accentY + 14); accentColorInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
 
             // Palette swatches
             int swX = mainX + 120, swY = accentY + 14; int swSize = 18; for (int i=0;i<accentPalette.length;i++){
@@ -244,21 +244,21 @@ public class SettingsApp implements IApp {
                 guiGraphics.fill(sx, swY, sx+swSize, swY+swSize, accentPalette[i]);
                 // border for selected
                 if ((DraggableWindow.accentColorARGB & 0x00FFFFFF) == (accentPalette[i] & 0x00FFFFFF)) {
-                    guiGraphics.fill(sx-2, swY-2, sx+swSize+2, swY+swSize+2, 0x55FFFFFF);
+                    guiGraphics.fill(sx-2, swY-2, sx+swSize+2, swY+swSize+2, DraggableWindow.selectionOverlayColor());
                 }
                 // hover outline
                 if (mouseRelX >= sx && mouseRelX <= sx+swSize && mouseRelY >= swY && mouseRelY <= swY+swSize) {
-                    guiGraphics.fill(sx, swY, sx+swSize, swY+swSize, 0x33FFFFFF);
+                    guiGraphics.fill(sx, swY, sx+swSize, swY+swSize, DraggableWindow.selectionOverlayColor());
                 }
             }
 
             // Additional accessibility options (simple examples)
             int otherY = accentY + 48;
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("High Contrast Text"), mainX + 8, otherY, 0xFFFFFFFF, false);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("High Contrast Text"), mainX + 8, otherY, DraggableWindow.textPrimaryColor(), false);
             boolean highContrast = SETTINGS.containsKey("highContrast") && (Boolean)SETTINGS.get("highContrast") == true;
             int hcX = mainX + 220, hcY = otherY - 2; guiGraphics.fill(hcX, hcY, hcX+40, hcY+16, highContrast ? DraggableWindow.accentColorARGB : 0xFF777777);
 
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Large Text"), mainX + 8, otherY + 22, 0xFFFFFFFF, false);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Large Text"), mainX + 8, otherY + 22, DraggableWindow.textPrimaryColor(), false);
             boolean largeText = SETTINGS.containsKey("largeText") && (Boolean)SETTINGS.get("largeText") == true;
             int ltX = mainX + 220, ltY = otherY + 20; guiGraphics.fill(ltX, ltY, ltX+40, ltY+16, largeText ? DraggableWindow.accentColorARGB : 0xFF777777);
 
@@ -277,8 +277,8 @@ public class SettingsApp implements IApp {
             int previewY = by + 8;
             int previewW = mainW - (mainW / 3);
             int previewH = 180;
-            guiGraphics.fill(previewX - 4, previewY - 4, previewX + previewW + 4, previewY + previewH + 4, 0xFF222222);
-            guiGraphics.fill(previewX, previewY, previewX + previewW, previewY + previewH, 0xFF0F0F0F);
+            guiGraphics.fill(previewX - 4, previewY - 4, previewX + previewW + 4, previewY + previewH + 4, DraggableWindow.darkTheme ? 0xFF222222 : 0xFFE0E0E0);
+            guiGraphics.fill(previewX, previewY, previewX + previewW, previewY + previewH, DraggableWindow.darkTheme ? 0xFF0F0F0F : 0xFFFFFFFF);
 
             String previewName = selectedWallpaper != null ? selectedWallpaper : FilesManager.getInstance().getCurrentWallpaperName();
             // If the current wallpaper is a solid color, show that color; otherwise show image preview if available
@@ -291,7 +291,7 @@ public class SettingsApp implements IApp {
                 if (previewRes != null) {
                     try { guiGraphics.blit(previewRes, previewX + 8, previewY + 8, 0, 0, previewW - 16, previewH - 16, previewW - 16, previewH - 16); } catch (Exception ignored) {}
                 } else {
-                    guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("No preview"), previewX + 8, previewY + 8, 0xFFAAAAAA, false);
+                    guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("No preview"), previewX + 8, previewY + 8, DraggableWindow.textSecondaryColor(), false);
                 }
             }
 
@@ -338,29 +338,29 @@ public class SettingsApp implements IApp {
                 int drawY = thumbY + (thumbSize - scaledSize) / 2;
 
                 // background/border
-                guiGraphics.fill(drawX - 2, drawY - 2, drawX + scaledSize + 2, drawY + scaledSize + 2, 0xFF111111);
+                guiGraphics.fill(drawX - 2, drawY - 2, drawX + scaledSize + 2, drawY + scaledSize + 2, DraggableWindow.darkTheme ? 0xFF111111 : 0xFFDDDDDD);
 
                 ResourceLocation thumb = FilesManager.getInstance().getWallpaperPreviewResource(name);
                 if (thumb != null) {
                     try {
                         guiGraphics.blit(thumb, drawX, drawY, 0, 0, scaledSize, scaledSize, scaledSize, scaledSize);
                     } catch (Exception ignored) {
-                        guiGraphics.fill(drawX, drawY, drawX + scaledSize, drawY + scaledSize, 0xFF333333);
+                        guiGraphics.fill(drawX, drawY, drawX + scaledSize, drawY + scaledSize, DraggableWindow.darkTheme ? 0xFF333333 : 0xFFAAAAAA);
                     }
                 } else {
-                    guiGraphics.fill(drawX, drawY, drawX + scaledSize, drawY + scaledSize, 0xFF333333);
+                    guiGraphics.fill(drawX, drawY, drawX + scaledSize, drawY + scaledSize, DraggableWindow.darkTheme ? 0xFF333333 : 0xFFAAAAAA);
                 }
 
                 // hover overlay: compute alpha smoothly
                 if (hoverProgress > 0f) {
                     int alpha = Math.round(hoverProgress * 0x66); // up to 0x66 alpha
-                    int overlay = (alpha << 24);
+                    int overlay = (alpha << 24) | (DraggableWindow.darkTheme ? 0xFFFFFF : 0x000000);
                     guiGraphics.fill(drawX, drawY, drawX + scaledSize, drawY + scaledSize, overlay);
                 }
 
                 // selected outline
                 boolean isSel = name.equals(selectedWallpaper) || (selectedWallpaper == null && name.equals(FilesManager.getInstance().getCurrentWallpaperName()));
-                if (isSel) guiGraphics.fill(drawX - 2, drawY - 2, drawX + scaledSize + 2, drawY + scaledSize + 2, 0x66FFFFFF);
+                if (isSel) guiGraphics.fill(drawX - 2, drawY - 2, drawX + scaledSize + 2, drawY + scaledSize + 2, DraggableWindow.selectionOverlayColor());
             }
 
             // Simple scrollbar indicator under thumbnails
@@ -375,11 +375,11 @@ public class SettingsApp implements IApp {
                 guiGraphics.fill(handleX, scrollbarY, handleX + handleW, scrollbarY + scrollbarH, 0xFF555555);
             }
 
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Put PNG/JPG in chaoscrafts_device_mod/wallpapers"), mainX, scrollbarY + scrollbarH + 8, 0xFFBBBBBB, false);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Put PNG/JPG in chaoscrafts_device_mod/wallpapers"), mainX, scrollbarY + scrollbarH + 8, DraggableWindow.textSecondaryColor(), false);
             // Render solid-color presets under the thumbnails
             int presetsX = mainX + 8;
             int presetsY = scrollbarY + scrollbarH + 28;
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Solid color presets:"), presetsX, presetsY, 0xFFCCCCCC, false);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Solid color presets:"), presetsX, presetsY, DraggableWindow.textSecondaryColor(), false);
             int[] presets = new int[]{0xFF000000, 0xFFFFFFFF, 0xFF2B2B2B, 0xFF1E90FF, 0xFF57C07D, 0xFFF0A84B};
             int sx = presetsX + 140, sy = presetsY;
             for (int i = 0; i < presets.length; i++) {
@@ -393,7 +393,7 @@ public class SettingsApp implements IApp {
         }
 
         // Fallback: show basic appearance controls
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Accent Color:"), mainX + 8, cy + 36, 0xFFFFFFFF, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Accent Color:"), mainX + 8, cy + 36, DraggableWindow.textPrimaryColor(), false);
         accentColorInput.setX(mainX + 8);
         accentColorInput.setY(cy + 56);
         accentColorInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
@@ -582,4 +582,3 @@ public class SettingsApp implements IApp {
         }
     }
 }
-

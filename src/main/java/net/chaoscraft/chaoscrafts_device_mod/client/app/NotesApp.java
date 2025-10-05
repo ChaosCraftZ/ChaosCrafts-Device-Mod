@@ -122,17 +122,17 @@ public class NotesApp implements IApp {
         int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16, ch = r[3] - 40;
 
         // Header
-        guiGraphics.fill(cx, cy, cx + cw, cy + 30, 0xFF2B2B2B);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Notes"), cx + 10, cy + 8, 0xFFFFFFFF, false);
+        guiGraphics.fill(cx, cy, cx + cw, cy + 30, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFF0F0F0);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Notes"), cx + 10, cy + 8, DraggableWindow.textPrimaryColor(), false);
 
         // New note button
-        guiGraphics.fill(cx + cw - 80, cy + 5, cx + cw - 10, cy + 25, 0xFF4C7BD1);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("+ New"), cx + cw - 75, cy + 10, 0xFFFFFFFF, false);
+        guiGraphics.fill(cx + cw - 80, cy + 5, cx + cw - 10, cy + 25, DraggableWindow.accentColorARGB);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("+ New"), cx + cw - 75, cy + 10, DraggableWindow.contrastingColorFor(DraggableWindow.accentColorARGB), false);
 
         // Notes list (left panel)
         int listWidth = 200;
-        guiGraphics.fill(cx, cy + 40, cx + listWidth, cy + ch, 0xFF1E1E1E);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Your Notes"), cx + 10, cy + 45, 0xFFFFFFFF, false);
+        guiGraphics.fill(cx, cy + 40, cx + listWidth, cy + ch, DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFFF8F8F8);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Your Notes"), cx + 10, cy + 45, DraggableWindow.textPrimaryColor(), false);
 
         // List notes
         int noteY = cy + 65;
@@ -140,13 +140,13 @@ public class NotesApp implements IApp {
             boolean isSelected = selectedNote != null && selectedNote.title.equals(note.title);
 
             if (isSelected) {
-                guiGraphics.fill(cx, noteY, cx + listWidth, noteY + 20, 0x553333FF);
+                guiGraphics.fill(cx, noteY, cx + listWidth, noteY + 20, DraggableWindow.selectionOverlayColor());
             }
 
             String displayName = note.title;
             if (displayName.length() > 20) displayName = displayName.substring(0, 17) + "...";
 
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(displayName), cx + 10, noteY + 5, 0xFFFFFFFF, false);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(displayName), cx + 10, noteY + 5, DraggableWindow.textPrimaryColor(), false);
             noteY += 25;
         }
 
@@ -156,8 +156,8 @@ public class NotesApp implements IApp {
             int editorWidth = cw - listWidth - 10;
 
             // Title input
-            guiGraphics.fill(editorX, cy + 40, editorX + editorWidth, cy + 70, 0xFF1E1E1E);
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Title:"), editorX + 5, cy + 45, 0xFFFFFFFF, false);
+            guiGraphics.fill(editorX, cy + 40, editorX + editorWidth, cy + 70, DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFFF8F8F8);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Title:"), editorX + 5, cy + 45, DraggableWindow.textPrimaryColor(), false);
 
             noteTitleInput.setX(editorX + 50);
             noteTitleInput.setY(cy + 45);
@@ -166,28 +166,28 @@ public class NotesApp implements IApp {
             noteTitleInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
 
             // Content input
-            guiGraphics.fill(editorX, cy + 75, editorX + editorWidth, cy + ch, 0xFF1E1E1E);
+            guiGraphics.fill(editorX, cy + 75, editorX + editorWidth, cy + ch, DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFFFAFAFA);
 
             noteContentInput.setX(editorX + 5);
             noteContentInput.setY(cy + 80);
             noteContentInput.setWidth(editorWidth - 10);
             noteContentInput.setHeight(ch - 90);
-            noteContentInput.setTextColor(DraggableWindow.darkTheme ? 0xFFFFFFFF : 0xFF000000);
+            noteContentInput.setTextColor(DraggableWindow.textPrimaryColor());
             noteContentInput.setValue(selectedNote.content);
             noteContentInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
 
             // Save button
-            guiGraphics.fill(editorX + editorWidth - 100, cy + 45, editorX + editorWidth - 10, cy + 65, 0xFF4C7BD1);
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save"), editorX + editorWidth - 85, cy + 50, 0xFFFFFFFF, false);
+            guiGraphics.fill(editorX + editorWidth - 100, cy + 45, editorX + editorWidth - 10, cy + 65, DraggableWindow.accentColorARGB);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save"), editorX + editorWidth - 85, cy + 50, DraggableWindow.contrastingColorFor(DraggableWindow.accentColorARGB), false);
 
             // Delete button
             guiGraphics.fill(editorX + editorWidth - 200, cy + 45, editorX + editorWidth - 110, cy + 65, 0xFFF94144);
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Delete"), editorX + editorWidth - 195, cy + 50, 0xFFFFFFFF, false);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Delete"), editorX + editorWidth - 195, cy + 50, DraggableWindow.textPrimaryColor(), false);
         } else {
             int editorX = cx + listWidth + 10;
             int editorWidth = cw - listWidth - 10;
-            guiGraphics.fill(editorX, cy + 40, editorX + editorWidth, cy + ch, 0xFF1E1E1E);
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Select a note or create a new one"), editorX + 10, cy + 60, 0xFFFFFFFF, false);
+            guiGraphics.fill(editorX, cy + 40, editorX + editorWidth, cy + ch, DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFFFAFAFA);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Select a note or create a new one"), editorX + 10, cy + 60, DraggableWindow.textPrimaryColor(), false);
         }
     }
 
