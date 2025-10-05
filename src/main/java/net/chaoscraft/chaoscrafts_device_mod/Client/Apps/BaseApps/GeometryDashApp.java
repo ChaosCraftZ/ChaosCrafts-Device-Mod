@@ -10,6 +10,7 @@ import net.chaoscraft.chaoscrafts_device_mod.Client.Apps.AppManager.IApp;
 import net.chaoscraft.chaoscrafts_device_mod.Client.Screen.DraggableWindow;
 import net.chaoscraft.chaoscrafts_device_mod.Client.Sound.ModSounds;
 import net.chaoscraft.chaoscrafts_device_mod.Core.AsyncorAPI.AsyncRuntime;
+import net.chaoscraft.chaoscrafts_device_mod.Core.Util.ResourceLocationHelper;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -64,7 +65,7 @@ public class GeometryDashApp implements IApp {
     private boolean rotatingInAir = false;        // flag set on takeoff until landing
 
     // player texture (must include full path under textures/ and .png extension for direct blit)
-    private static final ResourceLocation CUBE_TEXTURE = ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gd_cube_icons/cube.png");
+    private static final ResourceLocation CUBE_TEXTURE = ResourceLocationHelper.mod("textures/gd_cube_icons/cube.png");
 
     // track prior grounded state for landing snap
     private boolean wasGrounded = true;

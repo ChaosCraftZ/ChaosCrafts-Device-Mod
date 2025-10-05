@@ -2,6 +2,7 @@ package net.chaoscraft.chaoscrafts_device_mod.Client.Sound;
 
 import net.chaoscraft.chaoscrafts_device_mod.CDM;
 import net.minecraft.core.BlockPos;
+import net.chaoscraft.chaoscrafts_device_mod.Core.Util.ResourceLocationHelper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
@@ -65,7 +66,7 @@ public class ModSounds {
     // Registration helper
     // ---------------------------------------------------------------------
     private static RegistryObject<SoundEvent> register(String eventName) {
-        ResourceLocation id = ResourceLocation.fromNamespaceAndPath(CDM.MOD_ID, eventName);
+        ResourceLocation id = ResourceLocationHelper.mod(eventName);
         return SOUND_EVENTS.register(eventName, () -> SoundEvent.createVariableRangeEvent(id));
     }
 

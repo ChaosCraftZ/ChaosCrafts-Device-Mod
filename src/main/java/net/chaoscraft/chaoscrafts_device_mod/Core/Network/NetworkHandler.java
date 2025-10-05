@@ -1,6 +1,7 @@
 package net.chaoscraft.chaoscrafts_device_mod.Core.Network;
 
 import net.minecraft.resources.ResourceLocation;
+import net.chaoscraft.chaoscrafts_device_mod.Core.Util.ResourceLocationHelper;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.PacketDistributor;
@@ -13,7 +14,7 @@ import java.util.function.Supplier;
 
 public class NetworkHandler {
     private static final String PROTOCOL = "1";
-    private static final ResourceLocation CHANNEL = ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "net");
+    private static final ResourceLocation CHANNEL = ResourceLocationHelper.namespace("chaoscrafts_device_mod", "net");
     private static final SimpleChannel INSTANCE = NetworkRegistry.newSimpleChannel(CHANNEL, () -> PROTOCOL, PROTOCOL::equals, PROTOCOL::equals);
     private static int id = 0;
 

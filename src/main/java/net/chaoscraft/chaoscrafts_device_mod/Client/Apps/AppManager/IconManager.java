@@ -2,6 +2,7 @@ package net.chaoscraft.chaoscrafts_device_mod.Client.Apps.AppManager;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
+import net.chaoscraft.chaoscrafts_device_mod.Core.Util.ResourceLocationHelper;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,19 +14,19 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class IconManager {
     private static final Map<String, ResourceLocation> ICON_MAP = new ConcurrentHashMap<>();
-    private static final ResourceLocation DEFAULT_ICON = ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/default_icon.png");
+    private static final ResourceLocation DEFAULT_ICON = ResourceLocationHelper.mod("textures/gui/icons/default_icon.png");
 
     static {
-        ICON_MAP.put("browser", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/browser_icon.png"));
-        ICON_MAP.put("files", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/files_icon.png"));
-        ICON_MAP.put("geometry dash", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/geometry_dash_icon.png"));
-        ICON_MAP.put("home security", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/home_security_icon.png"));
-        ICON_MAP.put("marketplace", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/marketplace_icon.png"));
-        ICON_MAP.put("notepad", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/notepad_icon.png"));
-        ICON_MAP.put("notes", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/notes_icon.png"));
-        ICON_MAP.put("paint", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/paint_icon.png"));
-        ICON_MAP.put("settings", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/settings_icon.png"));
-        ICON_MAP.put("youtube", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/youtube_icon.png"));
+        ICON_MAP.put("browser", ResourceLocationHelper.mod("textures/gui/icons/browser_icon.png"));
+        ICON_MAP.put("files", ResourceLocationHelper.mod("textures/gui/icons/files_icon.png"));
+        ICON_MAP.put("geometry dash", ResourceLocationHelper.mod("textures/gui/icons/geometry_dash_icon.png"));
+        ICON_MAP.put("home security", ResourceLocationHelper.mod("textures/gui/icons/home_security_icon.png"));
+        ICON_MAP.put("marketplace", ResourceLocationHelper.mod("textures/gui/icons/marketplace_icon.png"));
+        ICON_MAP.put("notepad", ResourceLocationHelper.mod("textures/gui/icons/notepad_icon.png"));
+        ICON_MAP.put("notes", ResourceLocationHelper.mod("textures/gui/icons/notes_icon.png"));
+        ICON_MAP.put("paint", ResourceLocationHelper.mod("textures/gui/icons/paint_icon.png"));
+        ICON_MAP.put("settings", ResourceLocationHelper.mod("textures/gui/icons/settings_icon.png"));
+        ICON_MAP.put("youtube", ResourceLocationHelper.mod("textures/gui/icons/youtube_icon.png"));
     }
 
     public static ResourceLocation getIconResource(String appName) {
