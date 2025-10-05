@@ -4,13 +4,10 @@ import com.mojang.logging.LogUtils;
 import net.chaoscraft.chaoscrafts_device_mod.block.ModBlocks;
 import net.chaoscraft.chaoscrafts_device_mod.block.entity.LaptopEntity;
 import net.chaoscraft.chaoscrafts_device_mod.block.entity.ModBlockEntities;
-import net.chaoscraft.chaoscrafts_device_mod.block.entity.client.LaptopRenderer;
 import net.chaoscraft.chaoscrafts_device_mod.item.ModCreativeModTabs;
 import net.chaoscraft.chaoscrafts_device_mod.item.ModItems;
 import net.chaoscraft.chaoscrafts_device_mod.sound.ModSounds;
-import net.minecraft.client.Minecraft;
 import net.minecraft.world.item.CreativeModeTabs;
-import net.minecraft.client.renderer.blockentity.BlockEntityRenderers;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraftforge.api.distmarker.Dist;
@@ -107,11 +104,16 @@ public class CDM {
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
             // Register block entity renderer
-            BlockEntityRenderers.register(ModBlockEntities.LAPTOP_ENTITY.get(), LaptopRenderer::new);
+            try {
+                net.minecraft.client.renderer.blockentity.BlockEntityRenderers.register(ModBlockEntities.LAPTOP_ENTITY.get(), net.chaoscraft.chaoscrafts_device_mod.block.entity.client.LaptopRenderer::new);
+            } catch (Exception ignored) {}
+
             // Register shutdown hook
-            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-                AsyncTaskManager.getInstance().shutdown();
-            }));
+            try {
+                Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                    AsyncTaskManager.getInstance().shutdown();
+                }));
+            } catch (Exception ignored) {}
 
             // Register example add-on apps and icons on client setup so other developers can see how to register
             try {

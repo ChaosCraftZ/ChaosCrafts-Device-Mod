@@ -2,10 +2,8 @@ package net.chaoscraft.chaoscrafts_device_mod.block.custom;
 
 import net.chaoscraft.chaoscrafts_device_mod.block.ModBlocks;
 import net.chaoscraft.chaoscrafts_device_mod.block.entity.LaptopEntity;
-import net.chaoscraft.chaoscrafts_device_mod.client.screen.DesktopScreen;
 import net.chaoscraft.chaoscrafts_device_mod.sound.ModSounds;
 import net.chaoscraft.chaoscrafts_device_mod.util.LaptopHitboxHelper;
-import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.InteractionHand;
@@ -31,6 +29,9 @@ import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.item.context.BlockPlaceContext;
+
+import net.minecraftforge.fml.DistExecutor;
+import net.minecraftforge.api.distmarker.Dist;
 
 public class Laptop extends BaseEntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
@@ -130,11 +131,19 @@ public class Laptop extends BaseEntityBlock {
             }
         }
 
-        // Client-side handling
+        // Client-side handling: open DesktopScreen only on client via DistExecutor to avoid referencing client classes on server
         if (laptop.isOpen() && onScreen) {
-            try {
-                Minecraft.getInstance().setScreen(new DesktopScreen());
-            } catch (Exception ignored) {}
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> (Runnable) () -> {
+                try {
+                    // Use reflection to avoid any direct class reference that would be detected by RuntimeDistCleaner
+                    Class<?> clientClass = Class.forName("net.chaoscraft.chaoscrafts_device_mod.client.LaptopClient");
+                    clientClass.getMethod("openDesktopScreen").invoke(null);
+                } catch (ClassNotFoundException cnfe) {
+                    // no client class available
+                } catch (Exception e) {
+                    // ignore runtime exceptions from reflective call
+                }
+            });
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
 
