@@ -1,0 +1,37 @@
+package net.chaoscraft.chaoscrafts_device_mod.Core.Config;
+
+import net.minecraftforge.common.ForgeConfigSpec;
+
+/**
+ * Central config holder. Adds a single experimentalSettings flag that controls
+ * whether certain experimental client features (currently: laptop fan sound) are enabled.
+ * When false (default) laptop fan noise is fully muted/disabled.
+ */
+public final class ConfigHandler {
+    private ConfigHandler() {}
+
+    public static final ForgeConfigSpec CLIENT_SPEC;
+    public static final Client CLIENT;
+
+    static {
+        ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
+        CLIENT = new Client(b);
+        CLIENT_SPEC = b.build();
+    }
+
+    public static class Client {
+        public final ForgeConfigSpec.BooleanValue experimentalSettings;
+        Client(ForgeConfigSpec.Builder b) {
+            b.push("general");
+            experimentalSettings = b
+                    .comment("Enable experimental client features. When false the laptop fan sound is force-muted.")
+                    .define("experimentalSettings", false);
+            b.pop();
+        }
+    }
+
+    public static boolean experimentalEnabled() {
+        return CLIENT.experimentalSettings.get();
+    }
+}
+

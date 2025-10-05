@@ -1,0 +1,188 @@
+package net.chaoscraft.chaoscrafts_device_mod.Core.PC.block.custom;
+
+import net.chaoscraft.chaoscrafts_device_mod.Client.Sound.ModSounds;
+import net.chaoscraft.chaoscrafts_device_mod.Core.PC.block.ModBlocks;
+import net.chaoscraft.chaoscrafts_device_mod.Core.PC.block.entity.LaptopEntity;
+import net.chaoscraft.chaoscrafts_device_mod.Core.Util.GeckoLib.LaptopHitboxHelper;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import net.minecraft.core.Direction;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.DirectionProperty;
+import net.minecraft.world.level.block.state.properties.BooleanProperty;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+import java.util.List;
+import java.util.UUID;
+
+import net.minecraftforge.fml.DistExecutor;
+import net.minecraftforge.api.distmarker.Dist;
+
+public class Laptop extends BaseEntityBlock {
+    public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
+    public static final BooleanProperty OPEN = BlockStateProperties.OPEN;
+
+    public Laptop(Properties pProperties) {
+        super(pProperties);
+        this.registerDefaultState(this.stateDefinition.any()
+                .setValue(FACING, Direction.NORTH)
+                .setValue(OPEN, Boolean.valueOf(false)));
+    }
+
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<net.minecraft.world.level.block.Block, BlockState> builder) {
+        builder.add(FACING, OPEN);
+    }
+
+    @Override
+    public @Nullable BlockEntity newBlockEntity(BlockPos blockPos, BlockState blockState) {
+        return new LaptopEntity(blockPos, blockState);
+    }
+
+    @Override
+    public RenderShape getRenderShape(BlockState pState) {
+        return RenderShape.ENTITYBLOCK_ANIMATED;
+    }
+
+    @Override
+    public BlockState getStateForPlacement(BlockPlaceContext context) {
+        return this.defaultBlockState().setValue(FACING, context.getHorizontalDirection().getOpposite());
+    }
+
+    @Override
+    public void setPlacedBy(Level pLevel, BlockPos pPos, BlockState pState, @Nullable LivingEntity pPlacer, ItemStack pStack) {
+        super.setPlacedBy(pLevel, pPos, pState, pPlacer, pStack);
+        if (!pLevel.isClientSide) {
+            BlockEntity be = pLevel.getBlockEntity(pPos);
+            if (be instanceof LaptopEntity laptop) {
+                laptop.setWhiteVariant(pState.getBlock() == ModBlocks.LAPTOP_WHITE.get());
+                laptop.setOpen(false, false);
+
+                if (pStack.hasTag() && pStack.getTag().hasUUID("DeviceId")) {
+                    UUID id = pStack.getTag().getUUID("DeviceId");
+                    laptop.setDeviceId(id);
+                    laptop.loadDeviceStateFromFile();
+                } else {
+                    laptop.setDeviceId(UUID.randomUUID());
+                    laptop.getDeviceState().initializeDefaults();
+                    laptop.saveDeviceStateToFile();
+                }
+                laptop.setChanged();
+            }
+        }
+    }
+
+    @Override
+    public VoxelShape getShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext ctx) {
+        if (!state.is(this)) {
+            return LaptopHitboxHelper.getShapeForState(false, Direction.NORTH);
+        }
+
+        Direction facing = state.getValue(FACING);
+        boolean isOpen = state.getValue(OPEN);
+
+        return LaptopHitboxHelper.getShapeForState(isOpen, facing);
+    }
+
+    @Override
+    public VoxelShape getCollisionShape(BlockState state, BlockGetter world, BlockPos pos, CollisionContext ctx) {
+        return getShape(state, world, pos, ctx);
+    }
+
+    // In your Laptop.java, modify the use method:
+    @Override
+    public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
+        if (!state.is(this)) {
+            return InteractionResult.PASS;
+        }
+
+        BlockEntity be = level.getBlockEntity(pos);
+        if (!(be instanceof LaptopEntity laptop)) return InteractionResult.PASS;
+
+        // Convert hit to model-local coordinates
+        Vec3 hitVec = hit.getLocation().subtract(pos.getX(), pos.getY(), pos.getZ());
+        Direction facing = state.getValue(FACING);
+
+        // Determine if click is on screen
+        boolean onScreen = LaptopHitboxHelper.isPointOnScreen(hitVec, laptop.isOpen(), facing);
+
+        // Server-side handling
+        if (!level.isClientSide) {
+            // Handle texture switching (existing code)
+
+            // Handle open/close toggling
+            if (!player.isShiftKeyDown() || onScreen) {
+                if (onScreen && laptop.isOpen()) {
+                    // Screen click when open - pass through for UI
+                    return InteractionResult.PASS;
+                } else {
+                    // Toggle open/close state
+                    laptop.toggleOpen();
+                    BlockState newState = state.setValue(OPEN, laptop.isOpen());
+                    level.setBlock(pos, newState, 3);
+                    // Play open/close sound
+                    level.playSound(null, pos, laptop.isOpen() ? ModSounds.LAPTOP_OPEN.get() : ModSounds.LAPTOP_CLOSE.get(), SoundSource.BLOCKS, 0.6f, 1.0f + (level.random.nextFloat()-0.5f)*0.1f);
+                    return InteractionResult.sidedSuccess(level.isClientSide);
+                }
+            }
+        }
+
+        // Client-side handling
+        if (laptop.isOpen() && onScreen) {
+            DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> (Runnable) () -> {
+                try {
+                    // Use reflection to avoid any direct class reference that would be detected by RuntimeDistCleaner
+                    Class<?> clientClass = Class.forName("net.chaoscraft.chaoscrafts_device_mod.Client.LaptopClient");
+                    clientClass.getMethod("openDesktopScreen", BlockPos.class).invoke(null, pos);
+                } catch (ClassNotFoundException cnfe) {
+                    // no client class available
+                } catch (Exception e) {
+                    // ignore runtime exceptions from reflective call
+                }
+            });
+            return InteractionResult.sidedSuccess(level.isClientSide);
+        }
+
+        return InteractionResult.PASS;
+    }
+
+    @Override
+    public void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean isMoving) {
+        if (!state.is(newState.getBlock())) {
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+            if (blockEntity instanceof LaptopEntity) {
+                level.removeBlockEntity(pos);
+            }
+        }
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public List<ItemStack> getDrops(BlockState state, LootParams.Builder builder) {
+        BlockEntity blockEntity = builder.getOptionalParameter(LootContextParams.BLOCK_ENTITY);
+        if (blockEntity instanceof LaptopEntity laptop) {
+            ItemStack stack = new ItemStack(state.getBlock());
+            laptop.saveToItem(stack);
+            return List.of(stack);
+        }
+        return super.getDrops(state, builder);
+    }
+}

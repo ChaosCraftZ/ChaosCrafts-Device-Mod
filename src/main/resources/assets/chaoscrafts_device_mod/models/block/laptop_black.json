@@ -1,0 +1,8 @@
+{
+  "parent": "chaoscrafts_device_mod:block/laptop",
+  "textures": {
+    "layer0": "chaoscrafts_device_mod:block/laptop_uv_black",
+    "particle": "chaoscrafts_device_mod:block/laptop_uv_black"
+  }
+}
+

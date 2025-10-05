@@ -1,0 +1,173 @@
+{
+  "letsgo": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:lensko-lets-go",
+        "stream": true
+      }
+    ]
+  },
+  "laptop.keyboard1": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:keyboard1"
+      }
+    ]
+  },
+  "laptop.keyboard2": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:keyboard2"
+      }
+    ]
+  },
+  "laptop.keyboard3": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:keyboard3"
+      }
+    ]
+  },
+  "laptop.spacebar": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:laptop_spacebar"
+      }
+    ]
+  },
+  "laptop.trackpad": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:trackpad"
+      }
+    ]
+  },
+  "laptop.fan_noise": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:laptop_fan_noise",
+        "stream": true
+      }
+    ]
+  },
+  "laptop.open": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:laptop_close"
+      }
+    ]
+  },
+  "laptop.close": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:laptop_close"
+      }
+    ]
+  },
+  "laptop.keyboard_typing_global": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:keyboard_typing_global"
+      }
+    ]
+  },
+  "phone.touch1": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:trackpad"
+      }
+    ]
+  },
+  "phone.touch2": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:trackpad"
+      }
+    ]
+  },
+  "phone.unlock": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:keyboard1"
+      }
+    ]
+  },
+  "phone.notification": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:keyboard2"
+      }
+    ]
+  },
+  "phone.boot": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:keyboard3"
+      }
+    ]
+  },
+  "phone.shutdown": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:laptop_close"
+      }
+    ]
+  },
+  "pc.keyboard1": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:keyboard1"
+      }
+    ]
+  },
+  "pc.keyboard2": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:keyboard2"
+      }
+    ]
+  },
+  "pc.keyboard3": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:keyboard3"
+      }
+    ]
+  },
+  "pc.mouse_click": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:trackpad"
+      }
+    ]
+  },
+  "pc.fan_idle": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:laptop_fan_noise",
+        "stream": true
+      }
+    ]
+  },
+  "pc.boot": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:laptop_close"
+      }
+    ]
+  },
+  "pc.shutdown": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:laptop_close"
+      }
+    ]
+  },
+  "icon.error": {
+    "sounds": [
+      {
+        "name": "chaoscrafts_device_mod:error"
+      }
+    ]
+  }
+}
