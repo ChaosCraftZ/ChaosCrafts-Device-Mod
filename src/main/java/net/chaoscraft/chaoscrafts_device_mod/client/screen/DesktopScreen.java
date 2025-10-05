@@ -250,15 +250,16 @@ public class DesktopScreen extends Screen {
             guiGraphics.pose().scale(titleScale, titleScale, 1f);
             int scaledX = (int)((w / titleScale - tw) / 2f);
             int scaledY = (int)((centerY - 60) / titleScale);
-            guiGraphics.drawString(font, Component.literal(title), scaledX + 1, scaledY + 1, DraggableWindow.darkTheme ? 0x66000000 : 0x66FFFFFF, false);
-            guiGraphics.drawString(font, Component.literal(title), scaledX, scaledY, DraggableWindow.textPrimaryColor(), false);
+            drawShadowedString(guiGraphics, font, title, scaledX, scaledY);
             guiGraphics.pose().popPose();
 
             // subtitle under title
             String baseSub = "Loading apps & settings";
             int dots = (int) ((elapsed / 450) % 4);
             String sub = baseSub + ".".repeat(Math.max(0, dots));
-            guiGraphics.drawString(font, Component.literal(sub), (w - font.width(sub)) / 2, centerY - 24, DraggableWindow.textSecondaryColor(), false);
+            int subX = (w - font.width(sub)) / 2;
+            int subY = centerY - 24;
+            drawShadowedString(guiGraphics, font, sub, subX, subY);
 
             // Progress bar (centered around centerY)
             float targetProg = Math.min(1f, (float) elapsed / (float) MIN_LOADING_MS);
@@ -272,11 +273,11 @@ public class DesktopScreen extends Screen {
             guiGraphics.fill(bx, by, filled, by + barH, DraggableWindow.accentColorARGB);
             guiGraphics.fill(Math.max(bx, filled - 6), by, Math.min(bx + barW, filled + 6), by + barH, (DraggableWindow.accentColorARGB & 0x00FFFFFF) | 0x33FFFFFF);
 
-            // percentage: draw centered inside the progress bar
+            // percentage: shadow then white
             String pct = String.format("%d%%", Math.round(currentLoadingProgress * 100f));
             int pctX = bx + (barW - font.width(pct)) / 2;
             int pctY = by + Math.max(0, (barH - 8) / 2);
-            guiGraphics.drawString(font, Component.literal(pct), pctX, pctY, DraggableWindow.textPrimaryColor(), false);
+            drawShadowedString(guiGraphics, font, pct, pctX, pctY);
 
             // Particles (more varied and softer), spawn around the centered group
             synchronized (loadingParticles) {
@@ -309,7 +310,9 @@ public class DesktopScreen extends Screen {
 
             // Small footer hint
             String hint = "Press ESC to close";
-            guiGraphics.drawString(font, Component.literal(hint), w - font.width(hint) - 10, h - 24, DraggableWindow.darkTheme ? 0x66FFFFFF : 0x66000000, false);
+            int hintX = w - font.width(hint) - 10;
+            int hintY = h - 24;
+            drawShadowedString(guiGraphics, font, hint, hintX, hintY);
 
             // Keep overlay for minimum time
             return;
@@ -528,6 +531,16 @@ public class DesktopScreen extends Screen {
     }
 
     private static float lerp(float a, float b, float f) { return a + (b - a) * f; }
+
+    // Draw text with a dark shadow outline (always white main text)
+    private static void drawShadowedString(GuiGraphics g, net.minecraft.client.gui.Font font, String text, int x, int y) {
+        int shadow = 0x66000000; // dark shadow
+        g.drawString(font, Component.literal(text), x + 1, y + 1, shadow, false);
+        g.drawString(font, Component.literal(text), x - 1, y + 1, shadow, false);
+        g.drawString(font, Component.literal(text), x + 1, y - 1, shadow, false);
+        g.drawString(font, Component.literal(text), x - 1, y - 1, shadow, false);
+        g.drawString(font, Component.literal(text), x, y, 0xFFFFFFFF, false);
+    }
 
     private static String normalizeAppNameForIcon(String displayName) {
         if (displayName == null) return null;
