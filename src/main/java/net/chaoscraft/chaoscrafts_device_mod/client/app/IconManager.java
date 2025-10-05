@@ -5,6 +5,7 @@ import net.minecraft.resources.ResourceLocation;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
 
 /**
  * IconManager maps internal app names to ResourceLocations for icons.
@@ -14,6 +15,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class IconManager {
     private static final Map<String, ResourceLocation> ICON_MAP = new ConcurrentHashMap<>();
     private static final ResourceLocation DEFAULT_ICON = ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/default_icon.png");
+    // Keep a minimal set to avoid spamming logs for the same missing keys
+    private static final Set<String> missingIconLog = ConcurrentHashMap.newKeySet();
 
     static {
         ICON_MAP.put("browser", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/browser_icon.png"));
@@ -31,12 +34,20 @@ public class IconManager {
     public static ResourceLocation getIconResource(String appName) {
         if (appName == null) return DEFAULT_ICON;
         ResourceLocation rl = ICON_MAP.get(appName.toLowerCase());
-        if (rl == null) return DEFAULT_ICON;
+        if (rl == null) {
+            if (missingIconLog.add(appName.toLowerCase())) {
+                System.out.println("[IconManager] No registered icon for key: '" + appName + "' -> using default icon");
+            }
+            return DEFAULT_ICON;
+        }
         try {
-            // ensure resource exists; if not, fall back
+            // ensure resource exists; if not, fall back and log once
             Minecraft.getInstance().getResourceManager().getResource(rl);
             return rl;
         } catch (Exception e) {
+            if (missingIconLog.add(rl.toString())) {
+                System.out.println("[IconManager] Icon resource missing for key '" + appName + "' (" + rl + ") -> using default icon");
+            }
             return DEFAULT_ICON;
         }
     }

@@ -414,7 +414,8 @@ public class DesktopScreen extends Screen {
                     if (hovered) guiGraphics.fill(popupX + 6, ry, popupX + 6 + rw, ry + RESULT_HEIGHT, DraggableWindow.selectionOverlayColor());
                     int iconSizePx = 20;
                     int iconX = popupX + 10;
-                    // Try to resolve an icon for the result. If r.iconRes is null, attempt to derive from the display name.
+
+                    // Preferred: use icon passed with the SearchResult. If absent, attempt derived lookups.
                     ResourceLocation iconToUse = r.iconRes;
                     if (iconToUse == null) {
                         try {
@@ -422,9 +423,14 @@ public class DesktopScreen extends Screen {
                             if (derived != null && !derived.isEmpty()) iconToUse = IconManager.getIconResource(derived);
                         } catch (Exception ignored) { iconToUse = null; }
                     }
-                    if (iconToUse != null) {
-                        try { guiGraphics.blit(iconToUse, iconX, ry + (RESULT_HEIGHT - iconSizePx) / 2, 0, 0, iconSizePx, iconSizePx); } catch (Exception ignored) {}
+                    if (iconToUse == null) {
+                        try { iconToUse = IconManager.getIconResource(r.displayName.toLowerCase()); } catch (Exception ignored) { iconToUse = null; }
                     }
+
+                    if (iconToUse != null) {
+                        try { guiGraphics.blit(iconToUse, iconX, ry + (RESULT_HEIGHT - iconSizePx) / 2, 0, 0, iconSizePx, iconSizePx, iconSizePx, iconSizePx); } catch (Exception ignored) {}
+                    }
+
                     String label = r.displayName;
                     int textX = popupX + 12 + iconSizePx + 6;
                     int availTextW = popupW - (textX - popupX) - 12;
@@ -434,10 +440,10 @@ public class DesktopScreen extends Screen {
                  }
              }
 
-            // draw open-window taskbar icons starting after the search box and before trayLeft
+            int tx = 6 + searchBox.getWidth() + 8;
             int perEntry = 52;
-            int startX = 6 + searchBox.getWidth() + 8;
-            int available = Math.max(0, trayLeft - startX - 8);
+            int startX = tx;
+            int available = Math.max(0, width - startX - 8);
             int maxEntries = Math.max(0, available / perEntry);
             List<DraggableWindow> visibleWindows = new ArrayList<>();
             if (maxEntries > 0) {
@@ -448,7 +454,6 @@ public class DesktopScreen extends Screen {
                 }
             }
 
-            int tx = startX;
             for (DraggableWindow w : visibleWindows) {
                 int x0 = tx, y0 = tbY + 2, x1 = tx + perEntry - 8, y1 = height - 4;
                 boolean hovered = (mouseX >= x0 && mouseX <= x1 && mouseY >= y0 && mouseY <= y1);
@@ -522,9 +527,7 @@ public class DesktopScreen extends Screen {
     }
 
     private void updateSearchResults() {
-        searchResults.clear();
-        String q = searchBox.getValue().trim().toLowerCase();
-        if (q.isEmpty()) return;
+        searchResults.clear(); String q = searchBox.getValue().trim().toLowerCase(); if (q.isEmpty()) return;
         // Desktop icons
         for (DesktopIcon di : desktopIcons) {
             if (di.name.toLowerCase().contains(q)) {
@@ -546,38 +549,17 @@ public class DesktopScreen extends Screen {
                     }
                 }
                 searchResults.add(new SearchResult(display, icon, di.onClick));
-                if (icon == null) {
-                    String keyLog = di.name == null ? "<null>" : di.name;
-                    if (!missingIconLog.contains(keyLog)) {
-                        missingIconLog.add(keyLog);
-                        System.out.println("[DesktopScreen] Missing icon for desktop entry: " + keyLog);
-                    }
-                }
             }
         }
-
-        // Open windows / apps (handled once, not per-desktop-icon)
+        // Open windows / apps
         for (DraggableWindow w : openApps) {
             String appNameForMatch = w.appName == null ? "" : w.appName;
             if (appNameForMatch.toLowerCase().contains(q)) {
-                ResourceLocation icon = null;
-                try {
-                    String normalized = normalizeAppNameForIcon(appNameForMatch);
-                    if (normalized != null && !normalized.isEmpty()) icon = IconManager.getIconResource(normalized);
-                } catch (Exception ignored) {
-                    icon = null;
-                }
-                if (icon == null) {
-                    try { icon = IconManager.getIconResource(appNameForMatch.toLowerCase()); } catch (Exception ignored) { icon = null; }
-                }
+                String normalized = normalizeAppNameForIcon(appNameForMatch);
+                ResourceLocation icon = IconManager.getIconResource(normalized);
                 searchResults.add(new SearchResult(appNameForMatch, icon, () -> bringToFront(w)));
-                if (icon == null) {
-                    String keyLog = appNameForMatch == null ? "<null>" : appNameForMatch;
-                    if (!missingIconLog.contains(keyLog)) { missingIconLog.add(keyLog); System.out.println("[DesktopScreen] Missing icon for app/search entry: " + keyLog); }
-                }
             }
         }
-
     }
 
     private static float lerp(float a, float b, float f) { return a + (b - a) * f; }
@@ -1145,46 +1127,22 @@ public class DesktopScreen extends Screen {
     }
 
     private static class DesktopIcon {
-        final String name;
-        int targetX, targetY;
-        float displayX, displayY;
-        final Runnable onClick;
-        int iconSize = 32;
-
-        DesktopIcon(String name, int x, int y, Runnable onClick) {
-            this.name = name;
-            this.targetX = (x / ICON_GRID) * ICON_GRID;
-            this.targetY = (y / ICON_GRID) * ICON_GRID;
-            this.displayX = this.targetX;
-            this.displayY = this.targetY;
-            this.onClick = onClick;
-        }
-
+        final String name; int targetX, targetY; float displayX, displayY; final Runnable onClick; int iconSize = 32;
+        DesktopIcon(String name, int x, int y, Runnable onClick) { this.name = name; this.targetX = (x / ICON_GRID) * ICON_GRID; this.targetY = (y / ICON_GRID) * ICON_GRID; this.displayX = this.targetX; this.displayY = this.targetY; this.onClick = onClick; }
         void render(GuiGraphics g, int mouseX, int mouseY, boolean selected, int currentIconSize) {
-            this.iconSize = currentIconSize;
-            int dx = Math.round(displayX), dy = Math.round(displayY);
+            this.iconSize = currentIconSize; int dx = Math.round(displayX), dy = Math.round(displayY);
             boolean hover = mouseX >= dx && mouseX <= dx + iconSize && mouseY >= dy && mouseY <= dy + iconSize;
             if (selected) g.fill(dx - 6, dy - 6, dx + iconSize + 6, dy + iconSize + 14, 0x2233AAFF);
             g.fill(dx - 1, dy + iconSize + 1, dx + iconSize, dy + iconSize + 3, 0xAA000000);
             String key = name.contains(".") ? null : normalizeAppNameForIcon(name);
             ResourceLocation iconRes = IconManager.getIconResource(key);
-            try {
-                g.blit(iconRes, dx + 2, dy + 2, 0, 0, iconSize - 4, iconSize - 4, iconSize - 4, iconSize - 4);
-            } catch (Exception ignored) {
-            }
-            if (hover)
-                g.fill(dx - 2, dy - 2, dx + iconSize + 2, dy + iconSize + 2, DraggableWindow.selectionOverlayColor());
+            try { g.blit(iconRes, dx + 2, dy + 2, 0, 0, iconSize - 4, iconSize - 4, iconSize - 4, iconSize - 4); } catch (Exception ignored) {}
+            if (hover) g.fill(dx - 2, dy - 2, dx + iconSize + 2, dy + iconSize + 2, DraggableWindow.selectionOverlayColor());
             String displayName = toTitleCase(name);
-            if (Minecraft.getInstance().font.width(displayName) > iconSize + 10)
-                displayName = Minecraft.getInstance().font.plainSubstrByWidth(displayName, iconSize + 5) + "...";
-            // Draw label using the centralized shadow+white helper so it stays white in both themes
-            int textX = dx;
-            int textY = dy + iconSize + 4;
-            drawShadowedString(g, Minecraft.getInstance().font, displayName, textX, textY);
+            if (Minecraft.getInstance().font.width(displayName) > iconSize + 10) displayName = Minecraft.getInstance().font.plainSubstrByWidth(displayName, iconSize + 5) + "...";
+            // Use the shadowed white text helper to keep labels legible across themes
+            drawShadowedString(g, Minecraft.getInstance().font, displayName, dx, dy + iconSize + 4);
         }
-
-        boolean isInside(double mouseX, double mouseY, int currentIconSize) {
-            return mouseX >= displayX && mouseX <= displayX + currentIconSize && mouseY >= displayY && mouseY <= displayY + currentIconSize;
-        }
+        boolean isInside(double mouseX, double mouseY, int currentIconSize) { return mouseX >= displayX && mouseX <= displayX + currentIconSize && mouseY >= displayY && mouseY <= displayY + currentIconSize; }
     }
 }
