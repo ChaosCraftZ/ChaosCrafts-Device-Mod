@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+// for future usage currently its useless
 public class HomeSecurityClientState {
     private static final CopyOnWriteArrayList<CameraInfo> cameras = new CopyOnWriteArrayList<>();
 

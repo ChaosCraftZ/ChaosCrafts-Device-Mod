@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
+// for future usage
 public class CameraPackets {
     public static class CameraListRequest {
         public CameraListRequest() {}
@@ -19,7 +20,6 @@ public class CameraPackets {
         public static CameraListRequest decode(FriendlyByteBuf buf) { return new CameraListRequest(); }
         public static void handle(CameraListRequest msg, Supplier<NetworkEvent.Context> ctx) {
             ctx.get().enqueueWork(() -> {
-                // Server-side: build list and send back - CameraManager will handle
                 net.chaoscraft.chaoscrafts_device_mod.backend.CameraManager mgr = net.chaoscraft.chaoscrafts_device_mod.backend.CameraManager.getInstance();
                 List<CameraInfo> list = mgr.listCameras();
                 NetworkHandler.sendToPlayer(new CameraListResponse(list), ctx.get().getSender());
@@ -60,7 +60,6 @@ public class CameraPackets {
         }
         public static void handle(CameraListResponse msg, Supplier<NetworkEvent.Context> ctx) {
             ctx.get().enqueueWork(() -> {
-                // Client side: hand off to HomeSecurityApp UI (store in client state)
                 DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> net.chaoscraft.chaoscrafts_device_mod.client.app.HomeSecurityClientState.setCameras(msg.cameras));
             });
             ctx.get().setPacketHandled(true);
@@ -80,9 +79,7 @@ public class CameraPackets {
                 net.chaoscraft.chaoscrafts_device_mod.backend.CameraManager mgr = net.chaoscraft.chaoscrafts_device_mod.backend.CameraManager.getInstance();
                 CameraInfo ci = mgr.getCamera(msg.cameraId);
                 if (ci == null) return;
-                // forward capture request to owner
                 NetworkHandler.sendToPlayer(new CameraCaptureRequest(msg.cameraId, ci.width, ci.height, ci.fps), sender.getServer().getPlayerList().getPlayer(ci.owner));
-                // Note: permission checks omitted for brevity
             });
             ctx.get().setPacketHandled(true);
         }
@@ -102,12 +99,9 @@ public class CameraPackets {
         public static void encode(CameraCaptureRequest msg, FriendlyByteBuf buf) { buf.writeUtf(msg.cameraId); buf.writeInt(msg.width); buf.writeInt(msg.height); buf.writeInt(msg.fps); }
         public static CameraCaptureRequest decode(FriendlyByteBuf buf) { return new CameraCaptureRequest(buf.readUtf(), buf.readInt(), buf.readInt(), buf.readInt()); }
         public static void handle(CameraCaptureRequest msg, Supplier<NetworkEvent.Context> ctx) {
-            // Client (owner) receives this: capture an image and send snapshot back
             ctx.get().enqueueWork(() -> {
-                // Run client-only capture logic on the client
                 DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> () -> {
                     try {
-                        // Create a tiny placeholder image bytes (replace with real capture later)
                         byte[] data = ("CameraSnapshot:" + msg.cameraId + ",owner=" + net.minecraft.client.Minecraft.getInstance().player.getUUID()).getBytes();
                         NetworkHandler.sendToServer(new CameraSnapshot(msg.cameraId, data));
                     } catch (Exception e) {
@@ -133,7 +127,6 @@ public class CameraPackets {
         }
         public static void handle(CameraSnapshot msg, Supplier<NetworkEvent.Context> ctx) {
             ctx.get().enqueueWork(() -> {
-                // Server receives snapshot from owner and forwards to subscribed viewers
                 net.chaoscraft.chaoscrafts_device_mod.backend.CameraManager mgr = net.chaoscraft.chaoscrafts_device_mod.backend.CameraManager.getInstance();
                 List<ServerPlayer> viewers = mgr.getSubscribers(msg.cameraId);
                 if (viewers == null) return;

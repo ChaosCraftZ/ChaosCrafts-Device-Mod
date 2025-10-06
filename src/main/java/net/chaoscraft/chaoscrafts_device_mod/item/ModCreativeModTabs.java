@@ -18,7 +18,6 @@ public class ModCreativeModTabs {
             () -> CreativeModeTab.builder().icon(() -> new ItemStack(ModItems.LAPTOP_BLACK_ITEM.get()))
                     .title(Component.translatable("creativetab.cdm_tab"))
                     .displayItems((pParameters, pOutput) -> {
-                        // Add both laptop variants to the creative tab
                         pOutput.accept(ModItems.LAPTOP_BLACK_ITEM.get());
                         pOutput.accept(ModItems.LAPTOP_WHITE_ITEM.get());
                     })

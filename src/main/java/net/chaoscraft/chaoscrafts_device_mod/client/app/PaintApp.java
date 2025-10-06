@@ -15,9 +15,6 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Enhanced Paint app with HEX color picker, improved drawing, and proper stroke handling
- */
 public class PaintApp implements IApp {
     private DraggableWindow window;
     private final List<Stroke> strokes = new ArrayList<>();
@@ -26,19 +23,16 @@ public class PaintApp implements IApp {
     private int currentColor = 0xFF000000;
     private final AsyncTaskManager asyncManager = AsyncTaskManager.getInstance();
 
-    // UI elements
     private EditBox hexColorInput;
     private boolean hexInputFocused = false;
 
-    // Color picker state
     private boolean colorPickerOpen = false;
-    private float hue = 0f; // 0-360 degrees
-    private float saturation = 1f; // 0-1
-    private float value = 1f; // 0-1
+    private float hue = 0f;
+    private float saturation = 1f;
+    private float value = 1f;
     private boolean draggingHue = false;
     private boolean draggingSV = false;
 
-    // Default palette
     private final int[] palette = new int[]{
             0xFF000000, 0xFFFFFFFF, 0xFFF94144, 0xFFFFD166, 0xFF5AE999, 0xFF7AD7FF,
             0xFF9B59B6, 0xFF2ECC71, 0xFF3498DB, 0xFFF39C12
@@ -58,29 +52,23 @@ public class PaintApp implements IApp {
         int cx = r[0] + 8, cy = r[1] + 32;
         int cw = r[2] - 16, ch = r[3] - 40;
 
-        // Toolbar (alt surface — slightly darker than main canvas in light mode)
         guiGraphics.fill(cx, cy, cx + cw, cy + 36, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
 
-        // Clear button
         guiGraphics.fill(cx + 6, cy + 6, cx + 56, cy + 26, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Clear"), cx + 12, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
-        // Save button
         guiGraphics.fill(cx + 62, cy + 6, cx + 122, cy + 26, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save PNG"), cx + 68, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
-        // Brush size indicator
         guiGraphics.fill(cx + 128, cy + 6, cx + 148, cy + 26, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("" + brushSize), cx + 134, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
-        // Brush size controls
         guiGraphics.fill(cx + 154, cy + 6, cx + 174, cy + 20, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFBBBBBB);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("+"), cx + 160, cy + 8, DraggableWindow.textPrimaryColor(), false);
 
         guiGraphics.fill(cx + 154, cy + 12, cx + 174, cy + 26, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFBBBBBB);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("-"), cx + 160, cy + 14, DraggableWindow.textPrimaryColor(), false);
 
-        // Color palette
          int paletteX = cx + 180;
          for (int i = 0; i < palette.length; i++) {
              int px = paletteX + i * 20;
@@ -90,32 +78,25 @@ public class PaintApp implements IApp {
             }
          }
 
-         // Color picker button
          int colorPickerBtnX = paletteX + palette.length * 20 + 10;
         guiGraphics.fill(colorPickerBtnX, cy + 6, colorPickerBtnX + 80, cy + 26, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Colors"), colorPickerBtnX + 8, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
-         // HEX color input
          int hexInputX = colorPickerBtnX + 86;
          hexColorInput.setX(hexInputX);
          hexColorInput.setY(cy + 6);
          hexColorInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
 
-         // Current color preview
         guiGraphics.fill(hexInputX + 86, cy + 6, hexInputX + 106, cy + 26, currentColor);
-        // preview border: use alt surface in light mode so it reads darker than the main canvas
         guiGraphics.fill(hexInputX + 85, cy + 5, hexInputX + 107, cy + 27, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFBFBFBF);
 
-         // Color picker dialog
          if (colorPickerOpen) {
              renderColorPicker(guiGraphics, cx, cy, cw, ch);
          }
 
-         // Canvas area (main surface in light mode should be slightly lighter than other UI chrome)
          int canvasX = cx, canvasY = cy + 36;
          int canvasW = cw, canvasH = ch - 36;
         guiGraphics.fill(canvasX, canvasY, canvasX + canvasW, canvasY + canvasH, DraggableWindow.darkTheme ? 0xFF0F0F0F : 0xFFCCCCCC);
-        // Draw grid for better visibility
         int gridColor = DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFEEEEEE;
         for (int x = canvasX; x <= canvasX + canvasW; x += 10) {
             guiGraphics.fill(x, canvasY, x + 1, canvasY + canvasH, gridColor);
@@ -124,12 +105,10 @@ public class PaintApp implements IApp {
             guiGraphics.fill(canvasX, y, canvasX + canvasW, y + 1, gridColor);
         }
 
-        // Draw all strokes
         for (Stroke stroke : strokes) {
             drawStroke(guiGraphics, stroke, canvasX, canvasY);
         }
 
-        // Draw current stroke in progress
         if (currentStroke != null) {
             drawStroke(guiGraphics, currentStroke, canvasX, canvasY);
         }
@@ -141,32 +120,26 @@ public class PaintApp implements IApp {
         int pickerW = 250;
         int pickerH = 200;
 
-        // Color picker background (alt surface in light mode)
         guiGraphics.fill(pickerX, pickerY, pickerX + pickerW, pickerY + pickerH, DraggableWindow.darkTheme ? 0xFF333333 : 0xFFBFBFBF);
         guiGraphics.fill(pickerX - 1, pickerY - 1, pickerX + pickerW + 1, pickerY + pickerH + 1, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFBFBFBF);
 
-        // Hue slider (vertical)
         int hueX = pickerX + pickerW - 20;
         int hueY = pickerY + 10;
         int hueH = pickerH - 40;
 
-        // Draw hue gradient
         for (int y = 0; y < hueH; y++) {
             float hueValue = (float) y / hueH * 360f;
             int hueColor = hsvToRgb(hueValue, 1f, 1f);
             guiGraphics.fill(hueX, hueY + y, hueX + 15, hueY + y + 1, hueColor);
         }
 
-        // Hue selector
         int hueSelectorY = hueY + (int) (hue / 360f * hueH);
         guiGraphics.fill(hueX - 2, hueSelectorY - 2, hueX + 17, hueSelectorY + 2, DraggableWindow.selectionOverlayColor());
 
-        // Saturation-Value box
         int svX = pickerX + 10;
         int svY = pickerY + 10;
         int svSize = pickerH - 40;
 
-        // Draw SV gradient
         for (int x = 0; x < svSize; x++) {
             for (int y = 0; y < svSize; y++) {
                 float s = (float) x / svSize;
@@ -176,21 +149,17 @@ public class PaintApp implements IApp {
             }
         }
 
-        // SV selector
         int svSelectorX = svX + (int) (saturation * svSize);
         int svSelectorY = svY + (int) ((1f - value) * svSize);
         guiGraphics.fill(svSelectorX - 2, svSelectorY - 2, svSelectorX + 2, svSelectorY + 2, DraggableWindow.selectionOverlayColor());
 
-        // Current color preview
         guiGraphics.fill(pickerX + 10, pickerY + pickerH - 25, pickerX + 40, pickerY + pickerH - 5, currentColor);
 
-        // OK button
         guiGraphics.fill(pickerX + pickerW - 50, pickerY + pickerH - 25, pickerX + pickerW - 10, pickerY + pickerH - 5, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("OK"), pickerX + pickerW - 40, pickerY + pickerH - 20, DraggableWindow.textPrimaryColor(), false);
     }
 
     private int hsvToRgb(float h, float s, float v) {
-        // Convert HSV to RGB
         int r = 0, g = 0, b = 0;
 
         if (s == 0) {
@@ -217,7 +186,6 @@ public class PaintApp implements IApp {
     }
 
     private void rgbToHsv(int color) {
-        // Convert RGB to HSV
         int r = (color >> 16) & 0xFF;
         int g = (color >> 8) & 0xFF;
         int b = color & 0xFF;
@@ -230,7 +198,6 @@ public class PaintApp implements IApp {
         float min = Math.min(rf, Math.min(gf, bf));
         float delta = max - min;
 
-        // Hue calculation
         if (delta == 0) {
             hue = 0;
         } else if (max == rf) {
@@ -243,10 +210,8 @@ public class PaintApp implements IApp {
 
         if (hue < 0) hue += 360;
 
-        // Saturation calculation
         saturation = max == 0 ? 0 : delta / max;
 
-        // Value calculation
         value = max;
     }
 
@@ -257,13 +222,11 @@ public class PaintApp implements IApp {
         for (int i = 1; i < stroke.points.size(); i++) {
             Point current = stroke.points.get(i);
 
-            // Draw line between points
             int x1 = canvasX + prev.x;
             int y1 = canvasY + prev.y;
             int x2 = canvasX + current.x;
             int y2 = canvasY + current.y;
 
-            // Simple line drawing algorithm
             drawLine(guiGraphics, x1, y1, x2, y2, stroke.color, stroke.size);
 
             prev = current;
@@ -278,7 +241,6 @@ public class PaintApp implements IApp {
         int err = dx - dy;
 
         while (true) {
-            // Draw a circle at each point
             guiGraphics.fill(x1 - size/2, y1 - size/2, x1 + size/2, y1 + size/2, color);
 
             if (x1 == x2 && y1 == y2) break;
@@ -300,7 +262,6 @@ public class PaintApp implements IApp {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 32, cw = r[2] - 16;
 
-        // Check if clicking in HEX input
         if (hexColorInput.isMouseOver(mouseRelX, mouseRelY)) {
             hexInputFocused = true;
             hexColorInput.mouseClicked(mouseRelX, mouseRelY, button);
@@ -308,7 +269,6 @@ public class PaintApp implements IApp {
         }
         hexInputFocused = false;
 
-        // Color picker button
         int colorPickerBtnX = cx + 180 + palette.length * 20 + 10;
         if (mouseRelX >= colorPickerBtnX && mouseRelX <= colorPickerBtnX + 80 &&
                 mouseRelY >= cy + 6 && mouseRelY <= cy + 26) {
@@ -319,18 +279,15 @@ public class PaintApp implements IApp {
             return true;
         }
 
-        // Handle color picker interactions
         if (colorPickerOpen) {
             int pickerX = cx + 50;
             int pickerY = cy + 50;
             int pickerW = 250;
             int pickerH = 200;
 
-            // Check if click is inside color picker
             if (mouseRelX >= pickerX && mouseRelX <= pickerX + pickerW &&
                     mouseRelY >= pickerY && mouseRelY <= pickerY + pickerH) {
 
-                // Hue slider
                 int hueX = pickerX + pickerW - 20;
                 int hueY = pickerY + 10;
                 int hueH = pickerH - 40;
@@ -343,7 +300,6 @@ public class PaintApp implements IApp {
                     return true;
                 }
 
-                // SV box
                 int svX = pickerX + 10;
                 int svY = pickerY + 10;
                 int svSize = pickerH - 40;
@@ -357,7 +313,6 @@ public class PaintApp implements IApp {
                     return true;
                 }
 
-                // OK button
                 if (mouseRelX >= pickerX + pickerW - 50 && mouseRelX <= pickerX + pickerW - 10 &&
                         mouseRelY >= pickerY + pickerH - 25 && mouseRelY <= pickerY + pickerH - 5) {
                     colorPickerOpen = false;
@@ -368,31 +323,26 @@ public class PaintApp implements IApp {
             }
         }
 
-        // Clear button
         if (mouseRelX >= cx + 6 && mouseRelX <= cx + 56 && mouseRelY >= cy + 6 && mouseRelY <= cy + 26) {
             strokes.clear();
             return true;
         }
 
-        // Save button
         if (mouseRelX >= cx + 62 && mouseRelX <= cx + 122 && mouseRelY >= cy + 6 && mouseRelY <= cy + 26) {
             exportPNG(window);
             return true;
         }
 
-        // Brush size increase
         if (mouseRelX >= cx + 154 && mouseRelX <= cx + 174 && mouseRelY >= cy + 6 && mouseRelY <= cy + 20) {
             brushSize = Math.min(20, brushSize + 1);
             return true;
         }
 
-        // Brush size decrease
         if (mouseRelX >= cx + 154 && mouseRelX <= cx + 174 && mouseRelY >= cy + 12 && mouseRelY <= cy + 26) {
             brushSize = Math.max(1, brushSize - 1);
             return true;
         }
 
-        // Color palette
         int paletteX = cx + 180;
         for (int i = 0; i < palette.length; i++) {
             int px = paletteX + i * 20;
@@ -403,7 +353,6 @@ public class PaintApp implements IApp {
             }
         }
 
-        // Start new stroke if clicking on canvas
         int canvasX = cx, canvasY = cy + 36, canvasW = cw, canvasH = r[3] - cy - 36;
         if (mouseRelX >= canvasX && mouseRelY >= canvasY && mouseRelX <= canvasX + canvasW && mouseRelY <= canvasY + canvasH) {
             currentStroke = new Stroke(currentColor, brushSize);
@@ -472,11 +421,9 @@ public class PaintApp implements IApp {
         int[] r = window.getRenderRect(26);
         int canvasX = r[0] + 8, canvasY = r[1] + 32 + 36;
 
-        // Convert to canvas local coordinates
         int cx = (int) (mouseRelX - canvasX);
         int cy = (int) (mouseRelY - canvasY);
 
-        // Only add point if it's within canvas bounds
         if (cx >= 0 && cy >= 0 && cx < (r[2] - 16) && cy < (r[3] - 40 - 36)) {
             currentStroke.points.add(new Point(cx, cy));
             return true;
@@ -490,14 +437,12 @@ public class PaintApp implements IApp {
         if (hexInputFocused) {
             boolean result = hexColorInput.charTyped(codePoint, modifiers);
             if (result) {
-                // Try to parse HEX color
                 try {
                     String hex = hexColorInput.getValue().replace("#", "");
                     if (hex.length() == 6) {
                         currentColor = 0xFF000000 | Integer.parseInt(hex, 16);
                     }
                 } catch (NumberFormatException e) {
-                    // Ignore invalid HEX
                 }
             }
             return result;
@@ -523,11 +468,9 @@ public class PaintApp implements IApp {
                 BufferedImage img = new BufferedImage(canvasW, canvasH, BufferedImage.TYPE_INT_ARGB);
                 Graphics2D g = img.createGraphics();
 
-                // White background
                 g.setColor(Color.WHITE);
                 g.fillRect(0, 0, canvasW, canvasH);
 
-                // Draw all strokes
                 for (Stroke stroke : strokes) {
                     g.setColor(new Color(stroke.color, true));
                     g.setStroke(new BasicStroke(stroke.size, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
@@ -545,7 +488,6 @@ public class PaintApp implements IApp {
 
                 File out = FilesManager.getInstance().saveImageAsWallpaper(img, "paint_export");
 
-                // Play sound on main thread
                 asyncManager.executeOnMainThread(() -> {
                     Minecraft.getInstance().getSoundManager().play(
                             net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
@@ -562,7 +504,6 @@ public class PaintApp implements IApp {
     @Override
     public boolean onClose(DraggableWindow window) { return true; }
 
-    // Stroke class to store drawing information
     private static class Stroke {
         final int color;
         final int size;
@@ -574,7 +515,6 @@ public class PaintApp implements IApp {
         }
     }
 
-    // Simple point class
     private static class Point {
         final int x, y;
 
@@ -584,4 +524,3 @@ public class PaintApp implements IApp {
         }
     }
 }
-

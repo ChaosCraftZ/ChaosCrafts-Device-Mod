@@ -153,7 +153,6 @@ public class LaptopEntity extends BlockEntity implements GeoBlockEntity {
         this.lastToggleTime = now;
         this.animationState = open ? "opening" : "closing";
         this.animationStartTime = now;
-        // Play the appropriate sound exactly when animation starts (client side only)
         if (level != null && level.isClientSide) {
             if (open) LaptopKeySoundManager.playLaptopOpen(); else LaptopKeySoundManager.playLaptopClose();
         }
@@ -220,7 +219,6 @@ public class LaptopEntity extends BlockEntity implements GeoBlockEntity {
                 this.animationState = this.open ? "opening" : "closing";
                 this.animationStartTime = System.currentTimeMillis();
                 if (level != null && level.isClientSide) {
-                    // Ensure correct sound plays on client when server syncs change
                     if (this.open) LaptopKeySoundManager.playLaptopOpen(); else LaptopKeySoundManager.playLaptopClose();
                     this.triggerAnim("controller", animationState);
                 }

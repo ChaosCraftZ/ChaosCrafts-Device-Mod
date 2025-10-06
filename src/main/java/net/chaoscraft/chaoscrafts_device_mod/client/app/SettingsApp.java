@@ -25,50 +25,37 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/**
- * Settings UI (overhauled wallpaper UX + Accessibility category + optimizations)
- */
 public class SettingsApp implements IApp {
     private DraggableWindow window;
     private EditBox accentColorInput;
     private boolean accentInputFocused = false;
     private final AsyncTaskManager asyncManager = AsyncTaskManager.getInstance();
 
-    // Static settings storage
     private static final Map<String, Object> SETTINGS = new HashMap<>();
     private static File settingsFile;
     private static final AtomicBoolean SETTINGS_LOADED = new AtomicBoolean(false);
 
-    // Accent color palette (kept)
     private final int[] accentPalette = new int[]{
             0xFF4C7BD1, 0xFFDB5C5C, 0xFF57C07D, 0xFFF0A84B,
             0xFF9B64E7, 0xFF2FB3C6, 0xFFD8D8D8, 0xFF000000
     };
 
-    // Wallpaper state for UI
     private List<String> wallpaperList = new ArrayList<>();
     private boolean wallpapersLoaded = false;
-    private String selectedWallpaper = null; // preview & selected
+    private String selectedWallpaper = null;
 
-    // Thumbnail scrolling state
-    private float thumbOffset = 0f; // horizontal pixel offset
+    private float thumbOffset = 0f;
     private float thumbScrollVelocity = 0f;
     private boolean draggingThumb = false;
     private int thumbDragStartX = 0;
     private float thumbDragStartOffset = 0f;
 
-    // visual settings
-    // Removed unused HSV fields and color picker flag
-
-    // UI categories
     private final String[] categories = new String[]{"General", "Appearance", "Accessibility", "Wallpapers"};
-    private int selectedCategoryIndex = 2; // default to Accessibility
+    private int selectedCategoryIndex = 2;
 
-    // Hover smoothing for thumbnails
     private int hoverIndex = -1;
     private float hoverAlpha = 0f;
 
-    // constructor/static init: load settings
     static {
         loadSettingsAsync().exceptionally(e -> {
             try { Minecraft.getInstance().execute(() -> setDefaultSettings()); } catch (Exception ignored) {}
@@ -100,11 +87,9 @@ public class SettingsApp implements IApp {
     public static void loadSettings() { loadSettingsAsync(); }
 
     private static void applyLoadedSettings() {
-        // If the file explicitly contains a boolean for darkTheme, honor it.
         if (SETTINGS.containsKey("darkTheme") && SETTINGS.get("darkTheme") instanceof Boolean) {
             DraggableWindow.darkTheme = (Boolean) SETTINGS.get("darkTheme");
         } else {
-            // No explicit setting found in loaded settings -> enable dark theme by default and persist that choice
             DraggableWindow.darkTheme = true;
             SETTINGS.put("darkTheme", true);
             saveSettingsAsync();
@@ -113,13 +98,11 @@ public class SettingsApp implements IApp {
         if (SETTINGS.containsKey("accentColor") && SETTINGS.get("accentColor") instanceof String) {
             try { DraggableWindow.accentColorARGB = 0xFF000000 | Integer.parseInt(((String)SETTINGS.get("accentColor")).replace("#",""), 16); } catch (Exception ignored) {}
         }
-        // Wallpaper handling: support both file-based wallpaper and solid-color wallpaper
         boolean isColor = false;
         if (SETTINGS.containsKey("wallpaperIsColor") && SETTINGS.get("wallpaperIsColor") instanceof Boolean) {
             isColor = (Boolean) SETTINGS.get("wallpaperIsColor");
         }
         if (isColor) {
-            // color may be stored as a number (Double from Gson) or as an Integer; handle both
             if (SETTINGS.containsKey("wallpaperColor")) {
                 Object c = SETTINGS.get("wallpaperColor");
                 try {
@@ -138,7 +121,6 @@ public class SettingsApp implements IApp {
     private static void setDefaultSettings() {
         SETTINGS.put("darkTheme", DraggableWindow.darkTheme);
         SETTINGS.put("accentColor", String.format("#%06X", DraggableWindow.accentColorARGB & 0xFFFFFF));
-        // Persist wallpaper choice with explicit color flag
         FilesManager fm = FilesManager.getInstance();
         if (fm != null && fm.isCurrentWallpaperColor()) {
             SETTINGS.put("wallpaperIsColor", true);
@@ -179,13 +161,11 @@ public class SettingsApp implements IApp {
                 wallpapersLoaded = true;
                 String cur = FilesManager.getInstance().getCurrentWallpaperName();
                 if (cur != null && wallpaperList.contains(cur)) selectedWallpaper = cur;
-                // Prefetch previews in small batches on main thread to avoid hitching
                 prefetchPreviewsInBatches();
             });
         });
     }
 
-    // Prefetch previews gradually on the main thread to avoid large frame stalls
     private void prefetchPreviewsInBatches() {
         final int batchSize = 4;
         asyncManager.submitCPUTask(() -> {
@@ -207,7 +187,6 @@ public class SettingsApp implements IApp {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 32, cw = r[2] - 16;
 
-        // Sidebar for categories
         int sidebarW = 140;
         guiGraphics.fill(cx, cy, cx + sidebarW, cy + 220, DraggableWindow.darkTheme ? 0xFF1A1A1A : 0xFFCCCCCC);
         for (int i = 0; i < categories.length; i++) {
@@ -216,43 +195,35 @@ public class SettingsApp implements IApp {
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(categories[i]), cx + 12, itemY, textColor, false);
         }
 
-        // Main area
         int mainX = cx + sidebarW + 12;
         int mainW = cw - sidebarW - 24;
 
-        // Render based on selected category
         String cat = categories[selectedCategoryIndex];
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(cat), mainX + 8, cy + 6, DraggableWindow.textPrimaryColor(), false);
 
         if ("Accessibility".equals(cat)) {
             int by = cy + 28;
-            // Dark Mode toggle
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Dark Mode"), mainX + 8, by + 6, DraggableWindow.textPrimaryColor(), false);
              int toggleX = mainX + 150, toggleY = by + 2, toggleW = 40, toggleH = 16;
              int toggleBg = DraggableWindow.darkTheme ? DraggableWindow.accentColorARGB : 0xFF777777;
              guiGraphics.fill(toggleX, toggleY, toggleX + toggleW, toggleY + toggleH, toggleBg);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(DraggableWindow.darkTheme ? "On" : "Off"), toggleX + 6, toggleY + 2, DraggableWindow.contrastingColorFor(toggleBg), false);
 
-            // Accent color input + palette
             int accentY = by + 34;
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Accent Color"), mainX + 8, accentY, DraggableWindow.textPrimaryColor(), false);
              accentColorInput.setX(mainX + 8); accentColorInput.setY(accentY + 14); accentColorInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
 
-            // Palette swatches
             int swX = mainX + 120, swY = accentY + 14; int swSize = 18; for (int i=0;i<accentPalette.length;i++){
                 int sx = swX + i*(swSize+6);
                 guiGraphics.fill(sx, swY, sx+swSize, swY+swSize, accentPalette[i]);
-                // border for selected
                 if ((DraggableWindow.accentColorARGB & 0x00FFFFFF) == (accentPalette[i] & 0x00FFFFFF)) {
                     guiGraphics.fill(sx-2, swY-2, sx+swSize+2, swY+swSize+2, DraggableWindow.selectionOverlayColor());
                 }
-                // hover outline
                 if (mouseRelX >= sx && mouseRelX <= sx+swSize && mouseRelY >= swY && mouseRelY <= swY+swSize) {
                     guiGraphics.fill(sx, swY, sx+swSize, swY+swSize, DraggableWindow.selectionOverlayColor());
                 }
             }
 
-            // Additional accessibility options (simple examples)
             int otherY = accentY + 48;
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("High Contrast Text"), mainX + 8, otherY, DraggableWindow.textPrimaryColor(), false);
             boolean highContrast = SETTINGS.containsKey("highContrast") && (Boolean)SETTINGS.get("highContrast") == true;
@@ -272,8 +243,7 @@ public class SettingsApp implements IApp {
                 return;
             }
 
-            // Large preview area at the top
-            int previewX = mainX + mainW / 6; // center-ish
+            int previewX = mainX + mainW / 6;
             int previewY = by + 8;
             int previewW = mainW - (mainW / 3);
             int previewH = 180;
@@ -281,7 +251,6 @@ public class SettingsApp implements IApp {
             guiGraphics.fill(previewX, previewY, previewX + previewW, previewY + previewH, DraggableWindow.darkTheme ? 0xFF0F0F0F : 0xFFFFFFFF);
 
             String previewName = selectedWallpaper != null ? selectedWallpaper : FilesManager.getInstance().getCurrentWallpaperName();
-            // If the current wallpaper is a solid color, show that color; otherwise show image preview if available
             boolean curIsColor = FilesManager.getInstance().isCurrentWallpaperColor();
             if (curIsColor) {
                 int col = FilesManager.getInstance().getCurrentWallpaperColor();
@@ -295,24 +264,20 @@ public class SettingsApp implements IApp {
                 }
             }
 
-            // Thumbnails strip (below the main preview)
             int thumbY = previewY + previewH + 14;
             int thumbSize = 64;
             int thumbPad = 10;
-            int thumbsVisibleW = previewW - 8; // leave a small margin
+            int thumbsVisibleW = previewW - 8;
 
-            // compute total width and clamp thumbOffset
             int totalThumbsW = wallpaperList.size() * (thumbSize + thumbPad);
             float maxOffset = Math.max(0, totalThumbsW - thumbsVisibleW + 4);
             clampThumbOffset(maxOffset);
 
-            // track hover and compute smooth alpha
             int newHoverIndex = -1;
             for (int i = 0; i < wallpaperList.size(); i++) {
                 int baseX = previewX + 4 + i * (thumbSize + thumbPad) - Math.round(thumbOffset);
-                if (baseX + thumbSize < previewX || baseX > previewX + thumbsVisibleW) continue; // skip offscreen
+                if (baseX + thumbSize < previewX || baseX > previewX + thumbsVisibleW) continue;
 
-                // detect hover (use unscaled bounds)
                 if (mouseRelX >= baseX && mouseRelX <= baseX + thumbSize && mouseRelY >= thumbY && mouseRelY <= thumbY + thumbSize) {
                     newHoverIndex = i;
                 }
@@ -324,20 +289,18 @@ public class SettingsApp implements IApp {
             }
             if (hoverIndex != -1) hoverAlpha = Math.min(1f, hoverAlpha + 0.14f); else hoverAlpha = Math.max(0f, hoverAlpha - 0.14f);
 
-            // now render thumbnails with hover scale/overlay
             for (int i = 0; i < wallpaperList.size(); i++) {
                 int baseX = previewX + 4 + i * (thumbSize + thumbPad) - Math.round(thumbOffset);
-                if (baseX + thumbSize < previewX || baseX > previewX + thumbsVisibleW) continue; // skip offscreen
+                if (baseX + thumbSize < previewX || baseX > previewX + thumbsVisibleW) continue;
                 String name = wallpaperList.get(i);
 
                 float hoverProgress = (i == hoverIndex) ? hoverAlpha : 0f;
-                float scale = 1.0f + 0.12f * hoverProgress; // up to +12%
+                float scale = 1.0f + 0.12f * hoverProgress;
                 int scaledSize = Math.round(thumbSize * scale);
                 int centerX = baseX + thumbSize / 2;
                 int drawX = centerX - scaledSize / 2;
                 int drawY = thumbY + (thumbSize - scaledSize) / 2;
 
-                // background/border
                 guiGraphics.fill(drawX - 2, drawY - 2, drawX + scaledSize + 2, drawY + scaledSize + 2, DraggableWindow.darkTheme ? 0xFF111111 : 0xFFDDDDDD);
 
                 ResourceLocation thumb = FilesManager.getInstance().getWallpaperPreviewResource(name);
@@ -351,19 +314,16 @@ public class SettingsApp implements IApp {
                     guiGraphics.fill(drawX, drawY, drawX + scaledSize, drawY + scaledSize, DraggableWindow.darkTheme ? 0xFF333333 : 0xFFAAAAAA);
                 }
 
-                // hover overlay: compute alpha smoothly
                 if (hoverProgress > 0f) {
-                    int alpha = Math.round(hoverProgress * 0x66); // up to 0x66 alpha
+                    int alpha = Math.round(hoverProgress * 0x66);
                     int overlay = (alpha << 24) | (DraggableWindow.darkTheme ? 0xFFFFFF : 0x000000);
                     guiGraphics.fill(drawX, drawY, drawX + scaledSize, drawY + scaledSize, overlay);
                 }
 
-                // selected outline
                 boolean isSel = name.equals(selectedWallpaper) || (selectedWallpaper == null && name.equals(FilesManager.getInstance().getCurrentWallpaperName()));
                 if (isSel) guiGraphics.fill(drawX - 2, drawY - 2, drawX + scaledSize + 2, drawY + scaledSize + 2, DraggableWindow.selectionOverlayColor());
             }
 
-            // Simple scrollbar indicator under thumbnails
             int scrollbarX = previewX + 4;
             int scrollbarY = thumbY + thumbSize + 10;
             int scrollbarH = 6;
@@ -376,7 +336,6 @@ public class SettingsApp implements IApp {
             }
 
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Put PNG/JPG in chaoscrafts_device_mod/wallpapers"), mainX, scrollbarY + scrollbarH + 8, DraggableWindow.textSecondaryColor(), false);
-            // Render solid-color presets under the thumbnails
             int presetsX = mainX + 8;
             int presetsY = scrollbarY + scrollbarH + 28;
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Solid color presets:"), presetsX, presetsY, DraggableWindow.textSecondaryColor(), false);
@@ -392,7 +351,6 @@ public class SettingsApp implements IApp {
             return;
         }
 
-        // Fallback: show basic appearance controls
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Accent Color:"), mainX + 8, cy + 36, DraggableWindow.textPrimaryColor(), false);
         accentColorInput.setX(mainX + 8);
         accentColorInput.setY(cy + 56);
@@ -411,7 +369,6 @@ public class SettingsApp implements IApp {
         int cx = r[0] + 8; int cw = r[2] - 16;
         int sidebarW = 140; int mainX = cx + sidebarW + 12; int mainW = cw - sidebarW - 24;
 
-        // Check sidebar category clicks
         for (int i = 0; i < categories.length; i++) {
             int itemY = r[1] + 32 + 8 + i * 34;
             if (mouseRelX >= cx && mouseRelX <= cx + sidebarW && mouseRelY >= itemY && mouseRelY <= itemY + 20) {
@@ -422,7 +379,6 @@ public class SettingsApp implements IApp {
 
         String cat = categories[selectedCategoryIndex];
 
-        // Handle Accessibility toggles & palette clicks
         if ("Accessibility".equals(cat)) {
             int by = r[1] + 32 + 28;
             int toggleX = mainX + 150, toggleY = by + 2, toggleW = 40, toggleH = 16;
@@ -442,7 +398,6 @@ public class SettingsApp implements IApp {
                     return true;
                 }
             }
-            // Additional toggles
             int otherY = accentY + 48;
             int hcX = mainX + 220, hcY = otherY - 2; if (mouseRelX >= hcX && mouseRelX <= hcX+40 && mouseRelY >= hcY && mouseRelY <= hcY+16) {
                 boolean cur = SETTINGS.containsKey("highContrast") && (Boolean)SETTINGS.get("highContrast") == true;
@@ -451,7 +406,6 @@ public class SettingsApp implements IApp {
                 boolean cur = SETTINGS.containsKey("largeText") && (Boolean)SETTINGS.get("largeText") == true;
                 SETTINGS.put("largeText", !cur); saveSettingsAsync(); return true; }
 
-            // Accent text input focus
             int aiX = mainX + 8, aiY = accentY + 14, aiW = 80, aiH = 16;
             if (mouseRelX >= aiX && mouseRelX <= aiX+aiW && mouseRelY >= aiY && mouseRelY <= aiY+aiH) {
                 accentInputFocused = true; return true;
@@ -462,20 +416,18 @@ public class SettingsApp implements IApp {
 
         if ("Wallpapers".equals(cat)) {
             int by = r[1] + 32 + 28;
-            int previewX = mainX + mainW / 6; // match render
+            int previewX = mainX + mainW / 6;
             int previewY = by + 8;
             int previewW = mainW - (mainW / 3);
             int previewH = 180;
             int thumbY = previewY + previewH + 14; int thumbSize = 64; int thumbPad = 10;
 
-            // detect thumbnail click & start dragging
             for (int i = 0; i < wallpaperList.size(); i++) {
                 int baseX = previewX + 4 + i * (thumbSize + thumbPad) - Math.round(thumbOffset);
                 if (mouseRelX >= baseX && mouseRelX <= baseX + thumbSize && mouseRelY >= thumbY && mouseRelY <= thumbY + thumbSize) {
                     String name = wallpaperList.get(i);
-                    selectedWallpaper = name; // update main preview immediately
-                    FilesManager.getInstance().setCurrentWallpaperName(name); // apply in-game
-                    // update settings to record file wallpaper
+                    selectedWallpaper = name;
+                    FilesManager.getInstance().setCurrentWallpaperName(name);
                     SETTINGS.put("wallpaper", name);
                     SETTINGS.put("wallpaperIsColor", false);
                     SETTINGS.remove("wallpaperColor");
@@ -484,18 +436,15 @@ public class SettingsApp implements IApp {
                 }
             }
 
-            // start dragging thumbnails if clicked within strip area
             if (mouseRelX >= previewX + 4 && mouseRelX <= previewX + previewW - 4 && mouseRelY >= thumbY && mouseRelY <= thumbY + thumbSize) {
                 draggingThumb = true; thumbDragStartX = (int) mouseRelX; thumbDragStartOffset = thumbOffset; return true;
             }
 
-            // Compute scrollbar position/size (same as renderContent) so presets can reference it
             int thumbsVisibleW = previewW - 8;
             int scrollbarX = previewX + 4;
             int scrollbarY = thumbY + thumbSize + 10;
             int scrollbarH = 6;
 
-            // Check color presets click
             int presetsX = mainX + 8;
             int presetsY = scrollbarY + scrollbarH + 28;
             int[] presets = new int[]{0xFF000000, 0xFFFFFFFF, 0xFF2B2B2B, 0xFF1E90FF, 0xFF57C07D, 0xFFF0A84B};
@@ -516,14 +465,12 @@ public class SettingsApp implements IApp {
             return false;
         }
 
-        // fallback: check accent input
         int[] rr = window.getRenderRect(26); int mainCX = rr[0]+8 + 140 + 12; int aiX = mainCX + 8, aiY = rr[1]+32 + 36, aiW = 80, aiH = 16;
         if (mouseRelX >= aiX && mouseRelX <= aiX+aiW && mouseRelY >= aiY && mouseRelY <= aiY+aiH) { accentInputFocused = true; return true; }
         accentInputFocused = false;
         return false;
     }
 
-    // allow scrolling thumbnails with mouse wheel
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!wallpapersLoaded || wallpaperList.isEmpty()) return false;
@@ -534,8 +481,7 @@ public class SettingsApp implements IApp {
 
         int thumbsVisibleW = previewW - 8;
         if (mouseX >= previewX + 4 && mouseX <= previewX + thumbsVisibleW && mouseY >= thumbY && mouseY <= thumbY + thumbSize) {
-            // add to velocity for smooth inertial scrolling
-            thumbScrollVelocity += (float)(-delta * 18.0); // explicit cast to float
+            thumbScrollVelocity += (float)(-delta * 18.0);
             return true;
         }
         return false;
@@ -546,10 +492,8 @@ public class SettingsApp implements IApp {
     @Override public void mouseReleased(DraggableWindow window, double mouseRelX, double mouseRelY, int button) { draggingThumb = false; }
     @Override public boolean mouseDragged(DraggableWindow window, double mouseRelX, double mouseRelY, double dx, double dy) {
         if (draggingThumb) {
-            // update thumbOffset based on drag delta
             float delta = (float) (mouseRelX - thumbDragStartX);
             thumbOffset = thumbDragStartOffset - delta;
-            // clamp while dragging
             int[] r = window.getRenderRect(26);
             int cx = r[0] + 8; int cw = r[2] - 16; int sidebarW = 140; int mainX = cx + sidebarW + 12; int mainW = cw - sidebarW - 24;
             int previewW = mainW - (mainW / 3);
@@ -564,11 +508,9 @@ public class SettingsApp implements IApp {
     }
     @Override public boolean onClose(DraggableWindow window) { return true; }
     @Override public void tick() {
-        // smooth scrolling velocity decay
         if (Math.abs(thumbScrollVelocity) > 0.01f) {
             thumbOffset += thumbScrollVelocity;
             thumbScrollVelocity *= 0.86f;
-            // clamp against bounds
             int[] r = window.getRenderRect(26);
             int cx = r[0] + 8; int cw = r[2] - 16;
             int sidebarW = 140; int mainX = cx + sidebarW + 12; int mainW = cw - sidebarW - 24;

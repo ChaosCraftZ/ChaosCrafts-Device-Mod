@@ -13,7 +13,6 @@ public class LaptopModel extends GeoModel<LaptopEntity> {
 
     @Override
     public ResourceLocation getTextureResource(LaptopEntity laptopEntity) {
-        // Choose texture based on the block entity's variant state
         String tex = laptopEntity != null && laptopEntity.isWhiteVariant() ? "textures/block/laptop_uv_white.png" : "textures/block/laptop_uv_black.png";
         return ResourceLocation.fromNamespaceAndPath(CDM.MOD_ID, tex);
     }

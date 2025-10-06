@@ -9,15 +9,10 @@ import net.minecraftforge.network.NetworkEvent;
 
 import java.util.function.Supplier;
 
-/**
- * Sent from client to server when local player presses a laptop key (for global typing sound others hear).
- * Carries optional device BlockPos so the sound originates from the device, not the player.
- */
 public class LaptopTypingPacket {
-    private final BlockPos devicePos; // nullable
+    private final BlockPos devicePos;
 
     public LaptopTypingPacket(BlockPos devicePos) { this.devicePos = devicePos; }
-    public LaptopTypingPacket() { this(null); }
 
     public static void encode(LaptopTypingPacket pkt, FriendlyByteBuf buf) {
         buf.writeBoolean(pkt.devicePos != null);
@@ -35,7 +30,6 @@ public class LaptopTypingPacket {
             ServerPlayer sender = ctx.getSender();
             if (sender != null) {
                 BlockPos origin = pkt.devicePos != null ? pkt.devicePos : sender.blockPosition();
-                // Exclude sender (use sender in first param) so only others hear, at device position
                 sender.level().playSound(sender, origin, ModSounds.LAPTOP_KEYBOARD_GLOBAL.get(), SoundSource.BLOCKS, 0.45f, 0.95f + sender.level().random.nextFloat()*0.1f);
             }
         });

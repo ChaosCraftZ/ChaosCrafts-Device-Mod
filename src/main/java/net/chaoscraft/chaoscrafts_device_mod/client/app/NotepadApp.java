@@ -34,30 +34,24 @@ public class NotepadApp implements IApp {
 
     private double mouseRelX, mouseRelY;
 
-    // Save dialog
     private boolean showSaveDialog = false;
     private EditBox saveFileNameInput;
     private EditBox filePathInput;
 
-    // Open dialog state
     private boolean showOpenDialog = false;
     private EditBox openFileNameInput;
     private EditBox openFilePathInput;
-    // Save-on-exit dialog state
     private boolean showSaveOnExitDialog = false;
 
-    // Undo/redo
     private final Deque<String> undoStack = new ArrayDeque<>();
     private final Deque<String> redoStack = new ArrayDeque<>();
 
-    // Recent files
     private final LinkedList<String> recentFiles = new LinkedList<>();
     private final File recentFilesFile = new File(FilesManager.getPlayerDataDir(), "notepad_recent.txt");
 
     private String statusMessage = "";
     private long statusMessageTime = 0L;
 
-    // Menu bar state
     private boolean showMenuBar = true;
     private boolean fileMenuOpen = false;
     private int fileMenuWidth = 180, fileMenuItemHeight = 22;
@@ -151,7 +145,6 @@ public class NotepadApp implements IApp {
     private void saveDocument() {
         File f = currentFile.get();
         if (f == null) {
-            // Quick-save: if no file is open, save immediately to player Documents/Untitled*.txt instead of prompting
             File dir = new File(FilesManager.getPlayerDataDir(), "Documents");
             if (!dir.exists()) dir.mkdirs();
             File saveFile = new File(dir, "Untitled.txt");
@@ -182,7 +175,6 @@ public class NotepadApp implements IApp {
                     playSound(SoundEvents.UI_BUTTON_CLICK.get());
                     addRecent(file);
                     if (closeAfterSave.getAndSet(false)) {
-                        // request the window to close (fade out) after save completes rather than closing the whole GUI
                         if (this.window != null) {
                             this.window.requestClose();
                         } else {
@@ -199,7 +191,6 @@ public class NotepadApp implements IApp {
     private void showStatus(String m) { statusMessage = m; statusMessageTime = System.currentTimeMillis(); }
     private void playSound(net.minecraft.sounds.SoundEvent sound) { Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(sound, 1.0F)); }
 
-    // undo/redo
     private void pushUndoState() {
         if (textArea == null) return;
         String v = textArea.getValue();
@@ -214,7 +205,6 @@ public class NotepadApp implements IApp {
 
     private void redo() { if (redoStack.isEmpty()) return; String n = redoStack.pop(); pushUndoState(); asyncManager.executeOnMainThread(() -> textArea.setValue(n)); }
 
-    // recent files
     private void addRecent(File f) { try { String p = f.getAbsolutePath(); recentFiles.remove(p); recentFiles.addFirst(p); while (recentFiles.size() > 20) recentFiles.removeLast(); saveRecentFiles(); } catch (Exception ignored) {} }
     private void loadRecentFiles() { recentFiles.clear(); try { if (recentFilesFile.exists()) { List<String> lines = Files.readAllLines(recentFilesFile.toPath()); for (String l : lines) if (!l.isBlank()) recentFiles.add(l); } } catch (IOException ignored) {} }
     private void saveRecentFiles() { try { if (recentFilesFile.getParentFile() != null) recentFilesFile.getParentFile().mkdirs(); try (Writer w = new FileWriter(recentFilesFile, false)) { for (String s : recentFiles) w.write(s + "\n"); } } catch (IOException ignored) {} }
@@ -246,28 +236,22 @@ public class NotepadApp implements IApp {
         int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16, ch = r[3] - 40;
         int textY = cy + 30, textHeight = ch - 30 - 20;
 
-        // Menu bar
         if (showMenuBar) {
-            // Use a slightly darker light-mode surface so menu elements read darker than the main text area
             guiGraphics.fill(cx, cy, cx + cw, cy + 24, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("File"), cx + 8, cy + 6, DraggableWindow.textPrimaryColor(), false);
-            // Save button in the menu bar for quick access
             int saveBtnX = cx + 64;
             int saveBtnY = cy + 3;
             int saveBtnW = 52;
             int saveBtnH = 18;
             guiGraphics.fill(saveBtnX, saveBtnY, saveBtnX + saveBtnW, saveBtnY + saveBtnH, 0xFF4CAF50);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save"), saveBtnX + 10, saveBtnY + 4, DraggableWindow.textPrimaryColor(), false);
-            // File menu dropdown
             if (fileMenuOpen) {
                 int mx = cx + 8, my = cy + 24;
                 int menuH = fileMenuItemHeight * (fileMenuItems.length + Math.min(5, recentFiles.size()));
-                // file menu background: slightly darker in light mode than the main editor
                 guiGraphics.fill(mx, my, mx + fileMenuWidth, my + menuH, DraggableWindow.darkTheme ? 0xFF444444 : 0xFFBFBFBF);
                 int idx = 0;
                 for (String item : fileMenuItems) {
                     if (item.equals("-")) {
-                        // separator line area: use darker light-mode shade
                         guiGraphics.fill(mx, my + idx * fileMenuItemHeight, mx + fileMenuWidth, my + (idx + 1) * fileMenuItemHeight, DraggableWindow.darkTheme ? 0xFF222222 : 0xFFBFBFBF);
                     } else {
                         int bg = (fileMenuSelected == idx) ? (DraggableWindow.darkTheme ? 0xFF6666AA : 0xFFDDDDEE) : 0x00000000;
@@ -276,9 +260,7 @@ public class NotepadApp implements IApp {
                     }
                     idx++;
                 }
-                // Recent files
                 if (!recentFiles.isEmpty()) {
-                    // "Recent files" heading should also use a darker light-mode background behind it
                     guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Recent files:"), mx + 8, my + idx * fileMenuItemHeight + 2, DraggableWindow.textSecondaryColor(), false);
                     idx++;
                     int rIdx = 0;
@@ -295,8 +277,6 @@ public class NotepadApp implements IApp {
             }
         }
 
-        // background for text area (use theme-aware color)
-        // dark mode keeps the darker field; light mode uses 0xFFCCCCCC per request (main element)
         int textBg = DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFF969696;
         guiGraphics.fill(cx, textY, cx + cw, textY + textHeight, textBg);
 
@@ -306,7 +286,6 @@ public class NotepadApp implements IApp {
         textArea.render(guiGraphics, (int)this.mouseRelX, (int)this.mouseRelY, partialTick);
 
         int statusY = textY + textHeight;
-        // make the status bar a bit darker than the main editor in light mode
         guiGraphics.fill(cx, statusY, cx + cw, statusY + 20, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
         int[] lc = getCursorLineCol();
         String name = currentFile.get() != null ? currentFile.get().getName() : "Untitled";
@@ -322,7 +301,6 @@ public class NotepadApp implements IApp {
         int w = 420, h = 140;
         int x = cx + (cw - w) / 2;
         int y = cy + (ch - h) / 2;
-        // Save dialog background: slightly darker in light mode than the main editor
         guiGraphics.fill(x, y, x + w, y + h, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
         guiGraphics.fill(x, y, x + w, y + 20, DraggableWindow.accentColorARGB);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save Document"), x + 8, y + 6, DraggableWindow.textPrimaryColor(), false);
@@ -343,7 +321,6 @@ public class NotepadApp implements IApp {
         int w = 420, h = 140;
         int x = cx + (cw - w) / 2;
         int y = cy + (ch - h) / 2;
-        // Open dialog background: slightly darker in light mode
         guiGraphics.fill(x, y, x + w, y + h, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
         guiGraphics.fill(x, y, x + w, y + 20, DraggableWindow.accentColorARGB);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Open Document"), x + 8, y + 6, DraggableWindow.textPrimaryColor(), false);
@@ -377,7 +354,6 @@ public class NotepadApp implements IApp {
     @Override
     public boolean mouseClicked(DraggableWindow window, double mouseRelX, double mouseRelY, int button) {
         this.mouseRelX = mouseRelX; this.mouseRelY = mouseRelY;
-        // Quick Save button in menu bar
         if (showMenuBar) {
             int[] r = window.getRenderRect(26);
             int cx = r[0] + 8, cy = r[1] + 28;
@@ -386,7 +362,6 @@ public class NotepadApp implements IApp {
             int saveBtnW = 52;
             int saveBtnH = 18;
             if (mouseRelX >= saveBtnX && mouseRelX <= saveBtnX + saveBtnW && mouseRelY >= saveBtnY && mouseRelY <= saveBtnY + saveBtnH) {
-                // Quick save
                 saveDocument();
                 return true;
             }
@@ -394,19 +369,14 @@ public class NotepadApp implements IApp {
         if (showSaveDialog) {
             int[] r = window.getRenderRect(26);
             int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16, ch = r[3] - 40;
-            // dialog size
             int w = 420, h = 140;
             int x = cx + (cw - w) / 2;
             int y = cy + (ch - h) / 2;
-            // Cancel button area
             if (mouseRelX >= x + w - 170 && mouseRelX <= x + w - 110 && mouseRelY >= y + h - 36 && mouseRelY <= y + h - 12) {
-                // Cancel button
                 showSaveDialog = false;
                 return true;
             }
-            // Save button area
             if (mouseRelX >= x + w - 100 && mouseRelX <= x + w - 40 && mouseRelY >= y + h - 36 && mouseRelY <= y + h - 12) {
-                // Save button
                 String fileName = saveFileNameInput.getValue().trim();
                 String filePath = filePathInput.getValue().trim();
                 if (fileName.isEmpty() || filePath.isEmpty()) {
@@ -417,7 +387,6 @@ public class NotepadApp implements IApp {
                         showStatus("Invalid directory: " + filePath);
                     } else {
                         File saveFile = new File(dir, fileName);
-                        // if this Save dialog was opened as part of a Save-on-exit flow, close after save
                         if (pendingCloseOnSave.getAndSet(false)) closeAfterSave.set(true);
                         asyncSaveDocument(saveFile);
                         showSaveDialog = false;
@@ -432,12 +401,10 @@ public class NotepadApp implements IApp {
             int w = 420, h = 140;
             int x = cx + (cw - w) / 2;
             int y = cy + (ch - h) / 2;
-            // Cancel
             if (mouseRelX >= x + w - 170 && mouseRelX <= x + w - 110 && mouseRelY >= y + h - 36 && mouseRelY <= y + h - 12) {
                 showOpenDialog = false;
                 return true;
             }
-            // Open
             if (mouseRelX >= x + w - 100 && mouseRelX <= x + w - 40 && mouseRelY >= y + h - 36 && mouseRelY <= y + h - 12) {
                 String fileName = openFileNameInput.getValue().trim();
                 String filePath = openFilePathInput.getValue().trim();
@@ -462,12 +429,9 @@ public class NotepadApp implements IApp {
             int w = 340, h = 100;
             int x = cx + (cw - w) / 2;
             int y = cy + (ch - h) / 2;
-            // Save
             if (mouseRelX >= x + 20 && mouseRelX <= x + 100 && mouseRelY >= y + h - 36 && mouseRelY <= y + h - 12) {
-                // Save and close when save completes
                 File f = currentFile.get();
                 if (f == null) {
-                    // prompt Save As and remember to close after the save
                     pendingCloseOnSave.set(true);
                     showSaveDialog = true;
                 } else {
@@ -477,48 +441,40 @@ public class NotepadApp implements IApp {
                 showSaveOnExitDialog = false;
                 return true;
             }
-            // Don't Save
             if (mouseRelX >= x + 120 && mouseRelX <= x + 200 && mouseRelY >= y + h - 36 && mouseRelY <= y + h - 12) {
                 showSaveOnExitDialog = false;
-                // request the window to close (fade out) instead of closing the whole screen
                 if (window != null) { window.requestClose(); }
                 return true;
             }
-            // Cancel
             if (mouseRelX >= x + 220 && mouseRelX <= x + 300 && mouseRelY >= y + h - 36 && mouseRelY <= y + h - 12) {
                 showSaveOnExitDialog = false;
                 return true;
             }
         }
-        // Menu bar
         if (showMenuBar) {
             int[] r = window.getRenderRect(26);
             int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16, ch = r[3] - 40;
             int mx = cx + 8, my = cy + 24;
-            // File menu
             if (mouseRelX >= cx + 8 && mouseRelX <= cx + 8 + fileMenuWidth && mouseRelY >= cy + 24 && mouseRelY <= cy + 24 + fileMenuItemHeight) {
                 fileMenuOpen = !fileMenuOpen;
                 fileMenuSelected = -1;
                 return true;
             }
-            // File menu items
             if (fileMenuOpen) {
                 int menuH = fileMenuItemHeight * (fileMenuItems.length + Math.min(5, recentFiles.size()));
                 if (mouseRelY >= my && mouseRelY <= my + menuH) {
-                    // cast to int because mouseRelY and my are doubles
                     int idx = (int) ((mouseRelY - my) / fileMenuItemHeight);
                     if (idx < fileMenuItems.length) {
                         fileMenuSelected = idx;
                         switch (idx) {
-                            case 0: newDocument(); fileMenuOpen = false; return true; // New
-                            case 1: showOpenDialog(); fileMenuOpen = false; return true; // Open
-                            case 2: saveDocument(); fileMenuOpen = false; return true; // Save
-                            case 3: showSaveDialog = true; fileMenuOpen = false; return true; // Save As
-                            case 4: showStatus("Print is not implemented"); fileMenuOpen = false; return true; // Print
-                            case 6: handleExit(); fileMenuOpen = false; return true; // Exit
+                            case 0: newDocument(); fileMenuOpen = false; return true;
+                            case 1: showOpenDialog(); fileMenuOpen = false; return true;
+                            case 2: saveDocument(); fileMenuOpen = false; return true;
+                            case 3: showSaveDialog = true; fileMenuOpen = false; return true;
+                            case 4: showStatus("Print is not implemented"); fileMenuOpen = false; return true;
+                            case 6: handleExit(); fileMenuOpen = false; return true;
                         }
                     } else {
-                        // Recent files
                         idx -= fileMenuItems.length;
                         if (idx < recentFiles.size()) {
                             File recentFile = new File(recentFiles.get(idx));
@@ -533,47 +489,42 @@ public class NotepadApp implements IApp {
         return textArea != null && textArea.mouseClicked(mouseRelX, mouseRelY, button);
     }
 
-    // Show open dialog (stub for now)
     private void showOpenDialog() {
         openFileNameInput.setValue("");
         openFilePathInput.setValue(new File(FilesManager.getPlayerDataDir(), "Documents").getAbsolutePath());
         showOpenDialog = true;
     }
 
-    // Prompt to save on exit if needed
     private void handleExit() {
         if (isModified.get()) {
             showSaveOnExitDialog = true;
         } else {
-            // fade/close the notepad window rather than closing whole UI
             if (this.window != null) { this.window.requestClose(); }
         }
     }
 
     @Override
     public boolean keyPressed(DraggableWindow window, int keyCode, int scanCode, int modifiers) {
-        // Handle Ctrl shortcuts first
         boolean ctrl = (modifiers & 0x2) != 0;
         boolean shift = (modifiers & 0x1) != 0;
         if (ctrl) {
             switch (keyCode) {
-                case 78: // 'N'
+                case 78:
                     newDocument(); return true;
-                case 79: // 'O'
+                case 79:
                     showOpenDialog(); return true;
-                case 83: // 'S'
+                case 83:
                     if (shift) { showSaveDialog = true; } else { saveDocument(); } return true;
-                case 80: // 'P'
+                case 80:
                     showSaveDialog = true; return true;
-                case 90: // 'Z'
+                case 90:
                     undo(); return true;
-                case 89: // 'Y'
+                case 89:
                     redo(); return true;
             }
         }
 
-        // Intercept Enter and Up/Down for simple multi-line behavior
-        if (keyCode == 257 || keyCode == 335) { // Enter
+        if (keyCode == 257 || keyCode == 335) {
             int pos = getEditCursorPos();
             String v = textArea.getValue(); if (v == null) v = "";
             String nv = v.substring(0, pos) + "\n" + v.substring(pos);
@@ -583,14 +534,13 @@ public class NotepadApp implements IApp {
             pushUndoState();
             return true;
         }
-        if (keyCode == 265) { // Up arrow -> move cursor to line start
+        if (keyCode == 265) {
             int[] lc = getCursorLineCol();
             int line = lc[0], col = lc[1];
             if (line > 1) {
-                // compute new pos: move to start of previous line plus min(col-1, length of prev line)
                 String s = textArea.getValue(); if (s == null) s = "";
                 int curPos = getEditCursorPos();
-                int scan = curPos - col - 1; // position of previous line start
+                int scan = curPos - col - 1;
                 if (scan < 0) scan = 0;
                 setEditCursorPos(scan);
             } else {
@@ -598,7 +548,7 @@ public class NotepadApp implements IApp {
             }
             return true;
         }
-        if (keyCode == 264) { // Down arrow -> move cursor to end of current line
+        if (keyCode == 264) {
             String s = textArea.getValue(); if (s == null) s = "";
             int curPos = getEditCursorPos();
             int len = s.length();
@@ -626,10 +576,8 @@ public class NotepadApp implements IApp {
 
     @Override
     public boolean onClose(DraggableWindow window) {
-        // Prompt to save if modified when the Notepad window is being closed
         if (isModified.get()) {
             showSaveOnExitDialog = true;
-            // veto immediate close so the dialog can be shown
             return false;
         }
         return true;
@@ -640,7 +588,6 @@ public class NotepadApp implements IApp {
         if (textArea != null) textArea.tick();
     }
 
-    // Simple multiline editor (minimal features for Enter and arrow navigation)
     private static class MultiLineEditor {
         private final net.minecraft.client.gui.Font font;
         private int x, y, width, height;
@@ -662,7 +609,6 @@ public class NotepadApp implements IApp {
         void setCursorPos(int p) { cursor = Math.max(0, Math.min(p, text.length())); }
 
         private java.util.List<String> getLines() {
-            // simple split by newline; no visual wrapping (keeps implementation simple and robust)
             String t = text.toString();
             if (t.isEmpty()) return java.util.Collections.singletonList("");
             String[] arr = t.split("\n", -1);
@@ -672,7 +618,6 @@ public class NotepadApp implements IApp {
         }
 
         void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-            // background: respect theme so light-mode shows 0xFFCCCCCC per user request
             g.fill(x, y, x + width, y + height, DraggableWindow.darkTheme ? 0xFF000000 : 0xFFCCCCCC);
             java.util.List<String> lines = getLines();
             int lineH = font.lineHeight;
@@ -681,11 +626,9 @@ public class NotepadApp implements IApp {
                 String line = lines.get(i);
                 g.drawString(font, Component.literal(line), x + 4, y + 2 + i * lineH, textColor, false);
             }
-            // caret (blinking)
             long now = System.currentTimeMillis();
             if (now - lastBlink > 500) { showCaret = !showCaret; lastBlink = now; }
             if (focused && showCaret) {
-                // compute caret position roughly (end of current line)
                 int lineIndex = 0; int pos = 0;
                 for (String ln : lines) {
                     if (cursor <= pos + ln.length()) break;
@@ -695,7 +638,6 @@ public class NotepadApp implements IApp {
                 String curLine = lineIndex < lines.size() ? lines.get(lineIndex) : "";
                 int caretX = x + 4 + font.width(curLine.substring(0, Math.max(0, Math.min(col, curLine.length()))));
                 int caretY = y + 2 + lineIndex * lineH;
-                // Use theme-aware primary text color so the caret is visible on light backgrounds
                 g.fill(caretX, caretY, caretX + 1, caretY + lineH - 2, DraggableWindow.textPrimaryColor());
              }
          }
@@ -703,7 +645,6 @@ public class NotepadApp implements IApp {
         boolean mouseClicked(double mx, double my, int button) {
             focused = (mx >= x && mx <= x + width && my >= y && my <= y + height);
             if (focused) {
-                // set cursor to nearest line end based on click Y (simple behavior)
                 int lineH = font.lineHeight;
                 int rel = (int)my - y;
                 int line = Math.max(0, rel / lineH);
@@ -712,7 +653,6 @@ public class NotepadApp implements IApp {
                 else {
                     int pos = 0;
                     for (int i = 0; i < line; i++) pos += lines.get(i).length() + 1;
-                    // set cursor at line start + approx char index based on X
                     int relX = (int)mx - x - 4;
                     int approxCol = 0;
                     for (int i = 1; i <= lines.get(line).length(); i++) {
@@ -726,25 +666,23 @@ public class NotepadApp implements IApp {
             return false;
         }
 
-        void mouseReleased(double mx, double my, int button) { /* no-op */ }
+        void mouseReleased(double mx, double my, int button) { }
 
         boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-            // Basic keyboard handling: backspace, delete, arrows, enter
             switch (keyCode) {
-                case 259: // backspace
+                case 259:
                     if (cursor > 0) { text.deleteCharAt(cursor - 1); cursor--; responder.accept(text.toString()); }
                     return true;
-                case 261: // delete
+                case 261:
                     if (cursor < text.length()) { text.deleteCharAt(cursor); responder.accept(text.toString()); }
                     return true;
-                case 262: // right
+                case 262:
                     if (cursor < text.length()) cursor++;
                     return true;
-                case 263: // left
+                case 263:
                     if (cursor > 0) cursor--;
                     return true;
-                case 265: // up
-                    // move to line above same col (approx)
+                case 265:
                     java.util.List<String> lines = getLines();
                     int pos = 0; int lineIdx = 0;
                     for (; lineIdx < lines.size(); lineIdx++) {
@@ -759,7 +697,7 @@ public class NotepadApp implements IApp {
                         cursor = Math.max(0, Math.min(newPos, text.length()));
                     }
                     return true;
-                case 264: // down
+                case 264:
                     java.util.List<String> all = getLines();
                     pos = 0; lineIdx = 0;
                     for (; lineIdx < all.size(); lineIdx++) {
@@ -774,7 +712,7 @@ public class NotepadApp implements IApp {
                         cursor = Math.max(0, Math.min(newPos, text.length()));
                     }
                     return true;
-                case 257: case 335: // Enter
+                case 257: case 335:
                     text.insert(cursor, '\n'); cursor++; responder.accept(text.toString()); return true;
             }
             return false;
@@ -782,7 +720,6 @@ public class NotepadApp implements IApp {
 
         boolean charTyped(char codePoint, int modifiers) {
             if (!focused) return false;
-            // ignore control chars
             if (codePoint >= 32) {
                 text.insert(cursor, codePoint); cursor++; responder.accept(text.toString());
                 return true;
@@ -790,6 +727,6 @@ public class NotepadApp implements IApp {
             return false;
         }
 
-        void tick() { /* caret blink handled in render */ }
+        void tick() { }
     }
 }

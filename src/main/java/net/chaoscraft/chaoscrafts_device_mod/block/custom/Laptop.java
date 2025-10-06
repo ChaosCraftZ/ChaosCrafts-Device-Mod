@@ -5,7 +5,6 @@ import net.chaoscraft.chaoscrafts_device_mod.block.entity.LaptopEntity;
 import net.chaoscraft.chaoscrafts_device_mod.sound.ModSounds;
 import net.chaoscraft.chaoscrafts_device_mod.util.LaptopHitboxHelper;
 import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
@@ -93,7 +92,6 @@ public class Laptop extends BaseEntityBlock {
         return getShape(state, world, pos, ctx);
     }
 
-    // In your Laptop.java, modify the use method:
     @Override
     public InteractionResult use(BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hit) {
         if (!state.is(this)) {
@@ -103,45 +101,32 @@ public class Laptop extends BaseEntityBlock {
         BlockEntity be = level.getBlockEntity(pos);
         if (!(be instanceof LaptopEntity laptop)) return InteractionResult.PASS;
 
-        // Convert hit to model-local coordinates
         Vec3 hitVec = hit.getLocation().subtract(pos.getX(), pos.getY(), pos.getZ());
         Direction facing = state.getValue(FACING);
 
-        // Determine if click is on screen
         boolean onScreen = LaptopHitboxHelper.isPointOnScreen(hitVec, laptop.isOpen(), facing);
 
-        // Server-side handling
         if (!level.isClientSide) {
-            // Handle texture switching (existing code)
-
-            // Handle open/close toggling
             if (!player.isShiftKeyDown() || onScreen) {
                 if (onScreen && laptop.isOpen()) {
-                    // Screen click when open - pass through for UI
                     return InteractionResult.PASS;
                 } else {
-                    // Toggle open/close state
                     laptop.toggleOpen();
                     BlockState newState = state.setValue(OPEN, laptop.isOpen());
                     level.setBlock(pos, newState, 3);
-                    // Play open/close sound
                     level.playSound(null, pos, laptop.isOpen() ? ModSounds.LAPTOP_OPEN.get() : ModSounds.LAPTOP_CLOSE.get(), SoundSource.BLOCKS, 0.6f, 1.0f + (level.random.nextFloat()-0.5f)*0.1f);
                     return InteractionResult.sidedSuccess(level.isClientSide);
                 }
             }
         }
 
-        // Client-side handling: open DesktopScreen only on client via DistExecutor to avoid referencing client classes on server
         if (laptop.isOpen() && onScreen) {
             DistExecutor.unsafeRunWhenOn(Dist.CLIENT, () -> (Runnable) () -> {
                 try {
-                    // Use reflection to avoid any direct class reference that would be detected by RuntimeDistCleaner
                     Class<?> clientClass = Class.forName("net.chaoscraft.chaoscrafts_device_mod.client.LaptopClient");
                     clientClass.getMethod("openDesktopScreen").invoke(null);
                 } catch (ClassNotFoundException cnfe) {
-                    // no client class available
                 } catch (Exception e) {
-                    // ignore runtime exceptions from reflective call
                 }
             });
             return InteractionResult.sidedSuccess(level.isClientSide);

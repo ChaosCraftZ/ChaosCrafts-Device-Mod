@@ -16,7 +16,6 @@ public class ModBlocks {
     public static final DeferredRegister<Block> BLOCKS =
             DeferredRegister.create(ForgeRegistries.BLOCKS, CDM.MOD_ID);
 
-    // Register two separate blocks that use the same Laptop class and model but are distinct blocks
     public static final RegistryObject<Block> LAPTOP_BLACK = BLOCKS.register("laptop_black",
             () -> new Laptop(BlockBehaviour.Properties.copy(Blocks.IRON_BARS).noOcclusion()));
 

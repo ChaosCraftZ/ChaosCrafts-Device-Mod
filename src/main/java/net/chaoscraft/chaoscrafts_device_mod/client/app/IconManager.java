@@ -7,15 +7,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.Set;
 
-/**
- * IconManager maps internal app names to ResourceLocations for icons.
- * If an app does not have a custom icon registered, default_icon.png is used.
- * Add-ons can register apps' icons at runtime via registerCustomIcon.
- */
 public class IconManager {
     private static final Map<String, ResourceLocation> ICON_MAP = new ConcurrentHashMap<>();
     private static final ResourceLocation DEFAULT_ICON = ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/default_icon.png");
-    // Keep a minimal set to avoid spamming logs for the same missing keys
     private static final Set<String> missingIconLog = ConcurrentHashMap.newKeySet();
 
     static {
@@ -41,7 +35,6 @@ public class IconManager {
             return DEFAULT_ICON;
         }
         try {
-            // ensure resource exists; if not, fall back and log once
             Minecraft.getInstance().getResourceManager().getResource(rl);
             return rl;
         } catch (Exception e) {

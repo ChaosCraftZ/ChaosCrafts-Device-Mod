@@ -6,26 +6,16 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 
-/**
- * ExampleAddOn demonstrates how an external developer can register a new app and icon.
- * This class is called from client setup as an example; add-ons should perform registration
- * during their client initialization (FMLClientSetupEvent) or another safe post-initialization step.
- */
+// example of a custom app add-on
 public class ExampleAddOn {
     public static void register() {
-        // Register a simple app factory under the internal name "example"
         AppFactory.registerApp("example", ExampleApp::new);
-
-        // Register an icon for the app. If you don't call this, the IconManager will serve default_icon.png.
         IconManager.registerCustomIcon("example", ResourceLocation.tryParse("chaoscrafts_device_mod:textures/gui/icons/default_icon.png"));
-
-        // Optionally install the app so it appears in the taskbar/desktop automatically
         try {
             AppRegistry.getInstance().installApp("example", "Example App", "A sample add-on app", "1.0");
         } catch (Exception ignored) {}
     }
 
-    // Minimal example app implementation. Real add-ons should implement a full-featured IApp.
     public static class ExampleApp implements IApp {
         private DraggableWindow window;
 
@@ -36,7 +26,6 @@ public class ExampleAddOn {
 
         @Override
         public void renderContent(GuiGraphics guiGraphics, PoseStack poseStack, DraggableWindow window, int mouseRelX, int mouseRelY, float partialTick) {
-            // Draw simple centered text
             int w = net.minecraft.client.Minecraft.getInstance().getWindow().getGuiScaledWidth();
             int h = net.minecraft.client.Minecraft.getInstance().getWindow().getGuiScaledHeight();
             String txt = "Hello from Example App";
@@ -63,4 +52,3 @@ public class ExampleAddOn {
         public boolean onClose(DraggableWindow window) { return true; }
     }
 }
-

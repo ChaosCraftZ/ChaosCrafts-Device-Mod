@@ -23,18 +23,15 @@ public class FilesApp implements IApp {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
     private final AsyncTaskManager asyncManager = AsyncTaskManager.getInstance();
 
-    // Current directory state
     private File currentDirectory;
     private File selectedFile = null;
     private boolean renaming = false;
     private EditBox renameBox;
 
-    // Text editor state
     private boolean editingFile = false;
     private EditBox fileEditor;
     private File editingFileRef = null;
 
-    // UI state
     private double mouseRelX, mouseRelY;
     private boolean showHiddenFiles = false;
     private String viewMode = "details";
@@ -42,11 +39,9 @@ public class FilesApp implements IApp {
     private List<File> searchResults = new ArrayList<>();
     private boolean inSearchMode = false;
 
-    // Navigation history
     private final LinkedList<File> navigationHistory = new LinkedList<>();
     private int historyPointer = -1;
 
-    // File operations state
     private File clipboardFile = null;
     private boolean isCutOperation = false;
 
@@ -56,7 +51,6 @@ public class FilesApp implements IApp {
         this.currentDirectory = new File(FilesManager.getPlayerDataDir(), "Documents");
         this.currentDirectory.mkdirs();
 
-        // Initialize with some default files if empty
         asyncManager.submitIOTask(this::initializeDefaultFiles);
     }
 
@@ -88,17 +82,14 @@ public class FilesApp implements IApp {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 32, cw = r[2] - 16, ch = r[3] - 40;
 
-        // If we're editing a file, show the text editor
         if (editingFile && editingFileRef != null) {
             renderTextEditor(guiGraphics, cx, cy, cw, ch);
             return;
         }
 
-        // Header with navigation (alt surface in light mode)
         guiGraphics.fill(cx, cy, cx + cw, cy + 30, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Files"), cx + 10, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
-        // Navigation buttons
         guiGraphics.fill(cx + cw - 120, cy + 5, cx + cw - 90, cy + 25, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("◀"), cx + cw - 115, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
@@ -108,43 +99,35 @@ public class FilesApp implements IApp {
         guiGraphics.fill(cx + cw - 40, cy + 5, cx + cw - 10, cy + 25, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("⬆"), cx + cw - 35, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
-        // Current path
         String path = getCurrentPath();
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(path), cx + 100, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
-        // Search box (alt surface in light mode)
         guiGraphics.fill(cx, cy + 35, cx + 200, cy + 55, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Search:"), cx + 5, cy + 40, DraggableWindow.textPrimaryColor(), false);
 
-        // File operation buttons
         int btnW = 92, btnH = 18;
         int bx = cx;
         int by = cy + 60;
 
-        // New Folder button
         guiGraphics.fill(bx, by, bx + btnW, by + btnH, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("New Folder"), bx + 8, by + 4, DraggableWindow.textPrimaryColor(), false);
 
-        // New Text File button
         int fx = bx + btnW + 8;
         guiGraphics.fill(fx, by, fx + btnW, by + btnH, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("New Text File"), fx + 8, by + 4, DraggableWindow.textPrimaryColor(), false);
 
-        // Delete button (only if something is selected)
         int dxBtn = fx + btnW + 8;
         if (selectedFile != null) {
             guiGraphics.fill(dxBtn, by, dxBtn + btnW, by + btnH, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Delete"), dxBtn + 8, by + 4, DraggableWindow.textPrimaryColor(), false);
         }
 
-        // Rename button (only if something is selected)
         int rxBtn = dxBtn + (selectedFile != null ? btnW + 8 : 0);
         if (selectedFile != null) {
             guiGraphics.fill(rxBtn, by, rxBtn + btnW, by + btnH, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Rename"), rxBtn + 8, by + 4, DraggableWindow.textPrimaryColor(), false);
         }
 
-        // Open/Edit button (only if something is selected)
         int oxBtn = rxBtn + (selectedFile != null ? btnW + 8 : 0);
         if (selectedFile != null) {
             guiGraphics.fill(oxBtn, by, oxBtn + btnW, by + btnH, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
@@ -153,7 +136,6 @@ public class FilesApp implements IApp {
                     oxBtn + 8, by + 4, DraggableWindow.textPrimaryColor(), false);
         }
 
-        // Copy/Cut/Paste buttons
         int copyX = oxBtn + (selectedFile != null ? btnW + 8 : 0);
         if (selectedFile != null) {
             guiGraphics.fill(copyX, by, copyX + btnW, by + btnH, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
@@ -172,7 +154,6 @@ public class FilesApp implements IApp {
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Paste"), pasteX + 8, by + 4, DraggableWindow.textPrimaryColor(), false);
         }
 
-        // Column headers (alt surface in light mode)
         int listY = by + btnH + 8;
         guiGraphics.fill(cx, listY, cx + cw, listY + 20, DraggableWindow.darkTheme ? 0xFF444444 : 0xFFBFBFBF);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Name"), cx + 6, listY + 6, DraggableWindow.textPrimaryColor(), false);
@@ -180,14 +161,12 @@ public class FilesApp implements IApp {
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Type"), cx + cw - 180, listY + 6, DraggableWindow.textPrimaryColor(), false);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Size"), cx + cw - 80, listY + 6, DraggableWindow.textPrimaryColor(), false);
 
-        // File list
         listY += 20;
         File[] files = inSearchMode ?
                 searchResults.toArray(new File[0]) :
                 currentDirectory.listFiles();
 
         if (files != null) {
-            // Sort files: directories first, then by name
             Arrays.sort(files, (f1, f2) -> {
                 if (f1.isDirectory() && !f2.isDirectory()) return -1;
                 if (!f1.isDirectory() && f2.isDirectory()) return 1;
@@ -200,7 +179,6 @@ public class FilesApp implements IApp {
                 boolean selected = selectedFile != null && selectedFile.equals(file);
                 if (selected) guiGraphics.fill(cx, listY, cx + cw, listY + 18, DraggableWindow.selectionOverlayColor());
 
-                // Icon based on file type
                 int iconX = cx + 4;
                 int iconY = listY + 1;
                 if (file.isDirectory()) {
@@ -209,7 +187,6 @@ public class FilesApp implements IApp {
                     guiGraphics.fill(iconX, iconY, iconX + 16, iconY + 16, 0xFF8888FF);
                 }
 
-                // Name (with editing if renaming)
                 if (renaming && selectedFile != null && selectedFile.equals(file)) {
                     if (renameBox == null) {
                         renameBox = new EditBox(Minecraft.getInstance().font, cx + 22, listY, 200, 16, Component.literal(file.getName()));
@@ -221,7 +198,6 @@ public class FilesApp implements IApp {
                     guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(file.getName()), cx + 22, listY + 3, DraggableWindow.textPrimaryColor(), false);
                 }
 
-                // Date, type, and size
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(getFormattedDate(file)), cx + cw/2 - 60, listY + 3, DraggableWindow.textSecondaryColor(), false);
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(getFileType(file)), cx + cw - 180, listY + 3, DraggableWindow.textSecondaryColor(), false);
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(getFormattedSize(file)), cx + cw - 80, listY + 3, DraggableWindow.textSecondaryColor(), false);
@@ -277,21 +253,17 @@ public class FilesApp implements IApp {
     }
 
     private void renderTextEditor(GuiGraphics guiGraphics, int cx, int cy, int cw, int ch) {
-        // Editor header
         guiGraphics.fill(cx, cy, cx + cw, cy + 30, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFF0F0F0);
         guiGraphics.drawString(Minecraft.getInstance().font,
                 Component.literal("Editing: " + editingFileRef.getName()),
                 cx + 10, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
-        // Save button
         guiGraphics.fill(cx + cw - 100, cy + 5, cx + cw - 10, cy + 25, DraggableWindow.accentColorARGB);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save"), cx + cw - 85, cy + 10, DraggableWindow.contrastingColorFor(DraggableWindow.accentColorARGB), false);
 
-        // Cancel button
         guiGraphics.fill(cx + cw - 200, cy + 5, cx + cw - 110, cy + 25, DraggableWindow.darkTheme ? 0xFF555555 : 0xFF999999);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Cancel"), cx + cw - 185, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
-        // Text editor area (main editor surface in light mode)
         int editorY = cy + 40;
         int editorH = ch - 40;
 
@@ -301,7 +273,6 @@ public class FilesApp implements IApp {
             fileEditor = new EditBox(Minecraft.getInstance().font, cx + 10, editorY + 10, cw - 20, editorH - 20, Component.literal(""));
             fileEditor.setMaxLength(Integer.MAX_VALUE);
 
-            // Load file content asynchronously
             asyncManager.submitIOTask(() -> {
                 try {
                     String content = new String(Files.readAllBytes(editingFileRef.toPath()));
@@ -329,7 +300,6 @@ public class FilesApp implements IApp {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 32, cw = r[2] - 16, ch = r[3] - 40;
 
-        // Handle navigation buttons
         if (mouseRelX >= cx + cw - 120 && mouseRelX <= cx + cw - 90 &&
                 mouseRelY >= cy + 5 && mouseRelY <= cy + 25) {
             navigateBack();
@@ -348,39 +318,33 @@ public class FilesApp implements IApp {
             return true;
         }
 
-        // Handle file operation buttons
         int btnW = 92, btnH = 18;
         int bx = cx;
         int by = cy + 60;
 
-        // New Folder button
         if (mouseRelX >= bx && mouseRelX <= bx + btnW && mouseRelY >= by && mouseRelY <= by + btnH) {
             createNewFolder();
             return true;
         }
 
-        // New Text File button
         int fx = bx + btnW + 8;
         if (mouseRelX >= fx && mouseRelX <= fx + btnW && mouseRelY >= by && mouseRelY <= by + btnH) {
             createNewTextFile();
             return true;
         }
 
-        // Delete button
         int dxBtn = fx + btnW + 8;
         if (selectedFile != null && mouseRelX >= dxBtn && mouseRelX <= dxBtn + btnW && mouseRelY >= by && mouseRelY <= by + btnH) {
             deleteSelected();
             return true;
         }
 
-        // Rename button
         int rxBtn = dxBtn + (selectedFile != null ? btnW + 8 : 0);
         if (selectedFile != null && mouseRelX >= rxBtn && mouseRelX <= rxBtn + btnW && mouseRelY >= by && mouseRelY <= by + btnH) {
             startRenaming();
             return true;
         }
 
-        // Open/Edit button
         int oxBtn = rxBtn + (selectedFile != null ? btnW + 8 : 0);
         if (selectedFile != null && mouseRelX >= oxBtn && mouseRelX <= oxBtn + btnW && mouseRelY >= by && mouseRelY <= by + btnH) {
             if (selectedFile.isDirectory()) {
@@ -391,7 +355,6 @@ public class FilesApp implements IApp {
             return true;
         }
 
-        // Copy button
         int copyX = oxBtn + (selectedFile != null ? btnW + 8 : 0);
         if (selectedFile != null && mouseRelX >= copyX && mouseRelX <= copyX + btnW && mouseRelY >= by && mouseRelY <= by + btnH) {
             clipboardFile = selectedFile;
@@ -399,7 +362,6 @@ public class FilesApp implements IApp {
             return true;
         }
 
-        // Cut button
         int cutX = copyX + (selectedFile != null ? btnW + 8 : 0);
         if (selectedFile != null && mouseRelX >= cutX && mouseRelX <= cutX + btnW && mouseRelY >= by && mouseRelY <= by + btnH) {
             clipboardFile = selectedFile;
@@ -407,14 +369,12 @@ public class FilesApp implements IApp {
             return true;
         }
 
-        // Paste button
         int pasteX = cutX + (clipboardFile != null ? btnW + 8 : 0);
         if (clipboardFile != null && mouseRelX >= pasteX && mouseRelX <= pasteX + btnW && mouseRelY >= by && mouseRelY <= by + btnH) {
             pasteFile();
             return true;
         }
 
-        // File list clicks
         int listY = by + btnH + 8 + 20;
         File[] files = inSearchMode ?
                 searchResults.toArray(new File[0]) :
@@ -433,7 +393,6 @@ public class FilesApp implements IApp {
                         selectedFile = file;
                         renaming = false;
 
-                        // Double click to open
                         if (button == 0 && System.currentTimeMillis() - lastClickTime < 500) {
                             if (file.isDirectory()) {
                                 navigateTo(file);
@@ -454,9 +413,7 @@ public class FilesApp implements IApp {
 
     private void navigateTo(File directory) {
         if (directory.isDirectory()) {
-            // Add to history
             if (historyPointer < navigationHistory.size() - 1) {
-                // We're in the middle of history, remove everything after current position
                 navigationHistory.subList(historyPointer + 1, navigationHistory.size()).clear();
             }
             navigationHistory.add(currentDirectory);
@@ -583,18 +540,15 @@ public class FilesApp implements IApp {
     private void openFileForEditing(File file) {
         if (file.isDirectory() || !file.canRead()) return;
 
-        // Check if it's a text file
         String name = file.getName().toLowerCase();
         if (name.endsWith(".txt") || name.endsWith(".json") || name.endsWith(".xml") ||
                 name.endsWith(".html") || name.endsWith(".css") || name.endsWith(".js")) {
-            // Open with Notepad
             NotepadApp.setFileToOpen(file);
             DesktopScreen desktop = (DesktopScreen) Minecraft.getInstance().screen;
             if (desktop != null) {
                 desktop.openAppSingle("notepad", 800, 600);
             }
         } else {
-            // Use built-in editor for other files
             editingFile = true;
             editingFileRef = file;
             fileEditor = null;
@@ -607,7 +561,6 @@ public class FilesApp implements IApp {
         try {
             File destination = new File(currentDirectory, clipboardFile.getName());
 
-            // Handle name conflicts
             int counter = 1;
             String baseName = clipboardFile.getName();
             if (baseName.contains(".")) {
@@ -632,7 +585,6 @@ public class FilesApp implements IApp {
                 Files.copy(clipboardFile.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING);
             }
 
-            // If it was a cut operation, delete the original
             if (isCutOperation) {
                 if (clipboardFile.isDirectory()) {
                     deleteDirectory(clipboardFile);
@@ -668,7 +620,7 @@ public class FilesApp implements IApp {
     @Override
     public boolean keyPressed(DraggableWindow window, int keyCode, int scanCode, int modifiers) {
         if (editingFile && fileEditor != null) {
-            if (keyCode == 257) { // Enter key - Save
+            if (keyCode == 257) {
                 asyncManager.submitIOTask(() -> {
                     try {
                         Files.write(editingFileRef.toPath(), fileEditor.getValue().getBytes());
@@ -682,7 +634,7 @@ public class FilesApp implements IApp {
                     }
                 });
                 return true;
-            } else if (keyCode == 256) { // Escape key - Cancel
+            } else if (keyCode == 256) {
                 editingFile = false;
                 editingFileRef = null;
                 fileEditor = null;
@@ -692,10 +644,10 @@ public class FilesApp implements IApp {
         }
 
         if (renaming && renameBox != null) {
-            if (keyCode == 257) { // Enter key
+            if (keyCode == 257) {
                 finishRenaming();
                 return true;
-            } else if (keyCode == 256) { // Escape key
+            } else if (keyCode == 256) {
                 renaming = false;
                 renameBox = null;
                 return true;
@@ -730,13 +682,11 @@ public class FilesApp implements IApp {
 
     @Override
     public boolean onClose(DraggableWindow window) {
-        // Allow the window to close normally (no special veto)
         return true;
     }
 
     @Override
     public void tick() {
-        // Handle any periodic updates if needed
     }
 
     private long lastClickTime = 0;

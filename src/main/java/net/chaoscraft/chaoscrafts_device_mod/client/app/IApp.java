@@ -12,12 +12,9 @@ public interface IApp {
     boolean mouseDragged(DraggableWindow window, double mouseRelX, double mouseRelY, double dx, double dy);
     boolean charTyped(DraggableWindow window, char codePoint, int modifiers);
     boolean keyPressed(DraggableWindow window, int keyCode, int scanCode, int modifiers);
-    // Called when a key is released. Default implementation returns false (not consumed).
     default boolean keyReleased(DraggableWindow window, int keyCode, int scanCode, int modifiers) { return false; }
-    // Return true to allow the window to close immediately, false to cancel/handle (e.g. show save dialog)
     default boolean onClose(DraggableWindow window) { return true; }
 
-    // Add these new methods
-    default void tick() {} // Default empty implementation
-    default boolean mouseScrolled(double mouseX, double mouseY, double delta) { return false; } // Default implementation
+    default void tick() {}
+    default boolean mouseScrolled(double mouseX, double mouseY, double delta) { return false; }
 }

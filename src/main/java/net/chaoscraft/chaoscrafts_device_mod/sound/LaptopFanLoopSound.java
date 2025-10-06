@@ -19,8 +19,6 @@ public class LaptopFanLoopSound extends AbstractTickableSoundInstance {
     private int fadeOutStartTick = -1;
     private float fadeOutStartVolume = 0f;
 
-    public LaptopFanLoopSound(SoundEvent event, double x, double y, double z) { this(event, x, y, z, 0); }
-
     public LaptopFanLoopSound(SoundEvent event, double x, double y, double z, int preDelayTicks) {
         super(event, SoundSource.BLOCKS, RandomSource.create());
         this.looping = true;
@@ -38,8 +36,6 @@ public class LaptopFanLoopSound extends AbstractTickableSoundInstance {
         fadeOutStartTick = ageTicks;
         fadeOutStartVolume = (this.volume > 0f ? this.volume : TARGET_VOLUME * 0.25f);
     }
-
-    public void requestStop() { if (!finished) stopRequested = true; }
 
     @Override
     public void tick() {

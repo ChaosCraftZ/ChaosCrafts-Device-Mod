@@ -9,6 +9,7 @@ import net.chaoscraft.chaoscrafts_device_mod.client.screen.DraggableWindow;
 
 import java.util.concurrent.atomic.AtomicReference;
 
+// also useless basically for now
 public class WeatherApp implements IApp {
     private DraggableWindow window;
     private final AsyncTaskManager asyncManager = AsyncTaskManager.getInstance();
@@ -25,11 +26,8 @@ public class WeatherApp implements IApp {
     private void fetchWeatherData() {
         asyncManager.submitIOTask(() -> {
             try {
-                // Simulate API call delay
                 Thread.sleep(1500);
 
-                // In a real implementation, you would fetch from a weather API
-                // For now, we'll use mock data
                 String[] weatherConditions = {"Sunny", "Cloudy", "Rainy", "Snowy", "Partly Cloudy"};
                 String[] temperatures = {"22°C", "18°C", "15°C", "-2°C", "20°C"};
 
@@ -38,7 +36,7 @@ public class WeatherApp implements IApp {
                 asyncManager.executeOnMainThread(() -> {
                     currentWeather.set(weatherConditions[randomIndex]);
                     temperature.set(temperatures[randomIndex]);
-                    location.set("New York, NY"); // Default location
+                    location.set("New York, NY");
                 });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -51,45 +49,37 @@ public class WeatherApp implements IApp {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16, ch = r[3] - 40;
 
-        // Header
         guiGraphics.fill(cx, cy, cx + cw, cy + 30, 0xFF2B2B2B);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Weather"), cx + 10, cy + 8, 0xFFFFFFFF, false);
 
-        // Refresh button
         guiGraphics.fill(cx + cw - 80, cy + 5, cx + cw - 10, cy + 25, 0xFF4C7BD1);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Refresh"), cx + cw - 75, cy + 10, 0xFFFFFFFF, false);
 
-        // Weather content
         int contentY = cy + 40;
         guiGraphics.fill(cx, contentY, cx + cw, contentY + ch - 40, 0xFF1E1E1E);
 
-        // Location
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Location: " + location.get()), cx + 10, contentY + 20, 0xFFFFFFFF, false);
 
-        // Temperature (large)
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(temperature.get()), cx + 10, contentY + 50, 0xFFFFFFFF, false);
 
-        // Weather condition
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(currentWeather.get()), cx + 10, contentY + 80, 0xFFFFFFFF, false);
 
-        // Weather icon based on condition
         int iconX = cx + cw - 100;
         int iconY = contentY + 40;
         int iconSize = 60;
 
         if (currentWeather.get().toLowerCase().contains("sunny")) {
-            guiGraphics.fill(iconX, iconY, iconX + iconSize, iconY + iconSize, 0xFFFFFF00); // Yellow sun
+            guiGraphics.fill(iconX, iconY, iconX + iconSize, iconY + iconSize, 0xFFFFFF00);
         } else if (currentWeather.get().toLowerCase().contains("cloud")) {
-            guiGraphics.fill(iconX, iconY, iconX + iconSize, iconY + iconSize, 0xFFCCCCCC); // Gray cloud
+            guiGraphics.fill(iconX, iconY, iconX + iconSize, iconY + iconSize, 0xFFCCCCCC);
         } else if (currentWeather.get().toLowerCase().contains("rain")) {
-            guiGraphics.fill(iconX, iconY, iconX + iconSize, iconY + iconSize, 0xFF3498DB); // Blue rain
+            guiGraphics.fill(iconX, iconY, iconX + iconSize, iconY + iconSize, 0xFF3498DB);
         } else if (currentWeather.get().toLowerCase().contains("snow")) {
-            guiGraphics.fill(iconX, iconY, iconX + iconSize, iconY + iconSize, 0xFFFFFFFF); // White snow
+            guiGraphics.fill(iconX, iconY, iconX + iconSize, iconY + iconSize, 0xFFFFFFFF);
         } else {
-            guiGraphics.fill(iconX, iconY, iconX + iconSize, iconY + iconSize, 0xFF888888); // Default
+            guiGraphics.fill(iconX, iconY, iconX + iconSize, iconY + iconSize, 0xFF888888);
         }
 
-        // Forecast section
         int forecastY = contentY + 120;
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("5-Day Forecast:"), cx + 10, forecastY, 0xFFFFFFFF, false);
 
@@ -111,7 +101,6 @@ public class WeatherApp implements IApp {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16;
 
-        // Refresh button
         if (mouseRelX >= cx + cw - 80 && mouseRelX <= cx + cw - 10 &&
                 mouseRelY >= cy + 5 && mouseRelY <= cy + 25) {
             fetchWeatherData();
@@ -126,7 +115,6 @@ public class WeatherApp implements IApp {
 
     @Override
     public void mouseReleased(DraggableWindow window, double mouseRelX, double mouseRelY, int button) {
-        // Empty implementation
     }
 
     @Override
@@ -146,7 +134,6 @@ public class WeatherApp implements IApp {
 
     @Override
     public boolean onClose(DraggableWindow window) {
-        // Allow the app window to close and clear references
         this.window = null;
         return true;
     }

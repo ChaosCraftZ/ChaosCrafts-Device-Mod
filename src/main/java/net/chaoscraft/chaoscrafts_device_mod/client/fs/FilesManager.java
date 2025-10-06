@@ -1,4 +1,3 @@
-// FilesManager.java (partial rewrite focusing on desktop operations)
 package net.chaoscraft.chaoscrafts_device_mod.client.fs;
 
 import com.google.gson.Gson;
@@ -27,31 +26,25 @@ public class FilesManager {
     private final File dataFile;
     private final File desktopStateFile;
     private final List<String> wallpaperFiles = new ArrayList<>();
-    // Cache preview resource locations for wallpapers
     private final Map<String, ResourceLocation> wallpaperPreviews = new HashMap<>();
 
-    // File system state
     private final Map<String, FSNode> fileSystem = new HashMap<>();
     private final List<DesktopIconState> desktopIcons = new ArrayList<>();
 
-    // Wallpaper state
     private DynamicTexture currentWallpaperTexture = null;
     private ResourceLocation currentWallpaperRL = null;
     private String currentWallpaperName = null;
 
-    // New: support solid color wallpaper
     private boolean currentWallpaperIsColor = false;
-    private int currentWallpaperColor = 0xFF000000; // ARGB
+    private int currentWallpaperColor = 0xFF000000;
 
-    // New: basic GIF support
     private boolean currentWallpaperIsGif = false;
     private List<BufferedImage> currentGifFrames = null;
-    private List<Integer> currentGifDelays = null; // milliseconds
+    private List<Integer> currentGifDelays = null;
     private int currentGifFrameIndex = 0;
     private Timer gifTimer = null;
 
-    // New constants
-    private static final int MAX_GIF_FRAMES = 60; // limit frames to avoid excessive memory use
+    private static final int MAX_GIF_FRAMES = 60;
 
     private FilesManager(File base) {
         this.baseDir = base;
@@ -72,7 +65,6 @@ public class FilesManager {
         return INST;
     }
 
-    // Get player-specific directory
     public static File getPlayerDataDir() {
         File playerDir = new File(Minecraft.getInstance().gameDirectory, "config/chaoscrafts_device_mod/players");
         String playerName = Minecraft.getInstance().player != null ?
@@ -82,16 +74,13 @@ public class FilesManager {
         return specificPlayerDir;
     }
 
-    // Get world-specific directory
     public static File getWorldDataDir() {
         File worldDir = new File(Minecraft.getInstance().gameDirectory, "saves");
         String worldName = "default";
 
-        // Check if we're in a world and the server is available
         if (Minecraft.getInstance().level != null && Minecraft.getInstance().level.getServer() != null) {
             worldName = Minecraft.getInstance().level.getServer().getWorldData().getLevelName();
         } else if (Minecraft.getInstance().getSingleplayerServer() != null) {
-            // Fallback to singleplayer server if available
             worldName = Minecraft.getInstance().getSingleplayerServer().getWorldData().getLevelName();
         }
 
@@ -100,10 +89,7 @@ public class FilesManager {
         return specificWorldDir;
     }
 
-    // ... rest of the class ...
-
     private void loadState() {
-        // Load file system from world data
         File worldDataFile = new File(getWorldDataDir(), "pc_ui_files.dat");
         if (worldDataFile.exists()) {
             try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(worldDataFile))) {
@@ -117,11 +103,9 @@ public class FilesManager {
                 e.printStackTrace();
             }
         } else {
-            // Create default file system
             createDefaultFileSystem();
         }
 
-        // Load desktop state from player data
         File playerDesktopFile = new File(getPlayerDataDir(), "desktop_state.json");
         if (playerDesktopFile.exists()) {
             try (Reader reader = new FileReader(playerDesktopFile)) {
@@ -131,15 +115,12 @@ public class FilesManager {
                     desktopIcons.clear();
                     if (state.icons != null) desktopIcons.addAll(state.icons);
 
-                    // Load wallpaper state from DesktopState (new fields)
                     if (state.wallpaperName != null) {
                         this.currentWallpaperName = state.wallpaperName;
                     }
                     this.currentWallpaperIsColor = state.wallpaperIsColor;
                     this.currentWallpaperColor = state.wallpaperColor != 0 ? state.wallpaperColor : this.currentWallpaperColor;
-                    // If wallpaper is a color, ensure we don't try to load a file.
                     if (this.currentWallpaperIsColor) {
-                        // Clear any previously loaded texture
                         clearCurrentWallpaperTexture();
                     }
                 }
@@ -147,20 +128,17 @@ public class FilesManager {
                 e.printStackTrace();
             }
         } else {
-            // Create default desktop icons
             createDefaultDesktop();
         }
     }
 
     public void saveState() {
-        // Save file system to world data
         try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(new File(getWorldDataDir(), "pc_ui_files.dat")))) {
             oos.writeObject(fileSystem);
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        // Save desktop state to player data
         saveDesktopState();
     }
 
@@ -175,19 +153,13 @@ public class FilesManager {
         }
     }
 
-    // ... rest of the class remains mostly the same ...
-
-
     private void createDefaultFileSystem() {
-        // Create root directory
         FSNode root = new FSNode("", true);
         fileSystem.put("/", root);
 
-        // Create user directory
         FSNode userDir = new FSNode("User", true);
         root.addChild(userDir);
 
-        // Create Documents, Pictures, etc.
         FSNode documents = new FSNode("Documents", true);
         FSNode pictures = new FSNode("Pictures", true);
         FSNode downloads = new FSNode("Downloads", true);
@@ -196,7 +168,6 @@ public class FilesManager {
         userDir.addChild(pictures);
         userDir.addChild(downloads);
 
-        // Create some sample files
         FSNode readme = new FSNode("README.txt", false);
         readme.setContent("Welcome to your virtual PC!\nThis is a sample text file.");
         documents.addChild(readme);
@@ -205,15 +176,11 @@ public class FilesManager {
         notes.setContent("Important notes:\n- Taskbar at the bottom\n- Search functionality\n- File browser with columns");
         documents.addChild(notes);
 
-        // Create Desktop directory
         FSNode desktop = new FSNode("Desktop", true);
         root.addChild(desktop);
     }
 
-    // In FilesManager.java, update the createDefaultDesktop method:
-
     private void createDefaultDesktop() {
-        // Get default apps from AppFactory
         List<String> defaultApps = AppFactory.getDefaultApps();
 
         int x = 150;
@@ -221,9 +188,8 @@ public class FilesManager {
 
         for (String appName : defaultApps) {
             desktopIcons.add(new DesktopIconState(appName, x, y));
-            x += 64; // Space icons horizontally
+            x += 64;
 
-            // If we reach the edge of the screen, move to next row
             if (x > 700) {
                 x = 150;
                 y += 80;
@@ -256,12 +222,10 @@ public class FilesManager {
         saveDesktopState();
     }
 
-
     public boolean createFile(String parentPath, String name, boolean isDirectory) {
         FSNode parent = getNode(parentPath);
         if (parent == null || !parent.isDirectory) return false;
 
-        // Check if name already exists
         if (parent.children.containsKey(name)) {
             return false;
         }
@@ -277,7 +241,6 @@ public class FilesManager {
         FSNode parent = getNode(parentPath);
         if (parent == null || !parent.isDirectory) return false;
 
-        // Check if name already exists
         if (parent.children.containsKey(name)) {
             return false;
         }
@@ -301,21 +264,16 @@ public class FilesManager {
         saveDesktopState();
     }
 
-    // File system operations
     public FSNode getNode(String path) {
         return fileSystem.get(path);
     }
-
-
-
 
     public boolean deleteNode(String path) {
         FSNode node = getNode(path);
         if (node == null) return false;
 
-        // Find parent
         int lastSlash = path.lastIndexOf('/');
-        if (lastSlash == -1) return false; // Can't delete root
+        if (lastSlash == -1) return false;
 
         String parentPath = path.substring(0, lastSlash);
         String name = path.substring(lastSlash + 1);
@@ -326,7 +284,6 @@ public class FilesManager {
         parent.removeChild(name);
         fileSystem.remove(path);
 
-        // If deleting from desktop, remove the desktop icon
         if (parentPath.equals("/Desktop")) {
             removeDesktopIcon(name);
         }
@@ -339,9 +296,8 @@ public class FilesManager {
         FSNode node = getNode(path);
         if (node == null) return false;
 
-        // Find parent
         int lastSlash = path.lastIndexOf('/');
-        if (lastSlash == -1) return false; // Can't rename root
+        if (lastSlash == -1) return false;
 
         String parentPath = path.substring(0, lastSlash);
         String oldName = path.substring(lastSlash + 1);
@@ -349,16 +305,13 @@ public class FilesManager {
         FSNode parent = getNode(parentPath);
         if (parent == null) return false;
 
-        // Remove from parent and add with new name
         parent.removeChild(oldName);
         node.name = newName;
         parent.addChild(node);
 
-        // Update file system map
         fileSystem.remove(path);
         fileSystem.put(parentPath + "/" + newName, node);
 
-        // If renaming on desktop, update the desktop icon
         if (parentPath.equals("/Desktop")) {
             for (DesktopIconState icon : desktopIcons) {
                 if (icon.name.equals(oldName)) {
@@ -379,7 +332,6 @@ public class FilesManager {
         return new ArrayList<>(node.children.values());
     }
 
-    // Wallpaper methods
     private void scanWallpapers() {
         wallpaperFiles.clear();
         File[] files = wallpapersDir.listFiles((d, n) -> {
@@ -406,15 +358,9 @@ public class FilesManager {
 
     public File getWallpapersDir() { return wallpapersDir; }
 
-    /**
-     * Choose a wallpaper by filename. Passing null clears the wallpaper.
-     */
     public void setCurrentWallpaperName(String name) {
-        // Clear any color mode
         currentWallpaperIsColor = false;
 
-        // Ensure any previous wallpaper resources/timers (especially GIFs) are cleared
-        // before setting a new wallpaper so old GIF timers don't keep re-registering textures.
         clearCurrentWallpaperTexture();
 
         if (name == null) {
@@ -427,21 +373,13 @@ public class FilesManager {
             if (f.exists()) {
                 System.out.println("[PC-UI] Setting wallpaper to file: " + name + " (exists=true)");
                 currentWallpaperName = name;
-                // Detect GIF
                 String low = name.toLowerCase(Locale.ROOT);
                 if (low.endsWith(".gif")) {
                     currentWallpaperIsGif = true;
-                    // Directly call GIF loader — it will handle client-thread registration as needed
                     loadGifAndStart(f);
                 } else {
                     currentWallpaperIsGif = false;
-                    // Direct call; loadCurrentWallpaper will schedule registration if needed
                     loadCurrentWallpaper();
-                    // Do NOT assign the preview resource to currentWallpaperRL here. The preview resources
-                    // are cached separately and may be released later; assigning them to the "current" slot
-                    // leads to the TextureManager releasing preview textures and leaving the cache with
-                    // stale ResourceLocations. Rendering will fall back to preview resources when no
-                    // current texture is yet registered (see FilesManager.getWallpaperPreviewResource).
                 }
             } else {
                 System.out.println("[PC-UI] Requested wallpaper file does not exist: " + name + " (path=" + f.getAbsolutePath() + ")");
@@ -450,9 +388,6 @@ public class FilesManager {
         saveState();
     }
 
-    /**
-     * Choose a solid color wallpaper (ARGB). This will clear any file-based wallpaper.
-     */
     public void setCurrentWallpaperColor(int argb) {
         System.out.println("[PC-UI] Setting solid color wallpaper: " + String.format("#%06X", argb & 0xFFFFFF));
         currentWallpaperIsColor = true;
@@ -461,7 +396,6 @@ public class FilesManager {
         currentWallpaperIsGif = false;
         clearCurrentWallpaperTexture();
 
-        // Release and clear any cached preview textures so the UI won't try to use them
         try {
             Minecraft mc = Minecraft.getInstance();
             if (mc != null) {
@@ -485,7 +419,6 @@ public class FilesManager {
     public int getCurrentWallpaperColor() { return currentWallpaperColor; }
 
     private void clearCurrentWallpaperTexture() {
-        // Stop GIF timer if running
         if (gifTimer != null) {
             gifTimer.cancel();
             gifTimer = null;
@@ -504,30 +437,25 @@ public class FilesManager {
         }
     }
 
-    // New helper: convert BufferedImage to PNG bytes
     private byte[] bufferedImageToPngBytes(BufferedImage img) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ImageIO.write(img, "PNG", baos);
         return baos.toByteArray();
     }
 
-    // New helper: register image bytes safely on the client thread. This avoids creating NativeImage on background threads
     private void registerImageBytesSafely(final byte[] pngBytes, final String id) {
         if (pngBytes == null) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc != null) {
             mc.execute(() -> {
                 try {
-                    // Create NativeImage on client thread to avoid cross-thread ownership issues
                     NativeImage n = null;
                     try (ByteArrayInputStream bais = new ByteArrayInputStream(pngBytes)) {
                         n = NativeImage.read(bais);
                     }
                     if (n == null) return;
-                    // quick validation
                     int ww = n.getWidth();
 
-                    // release previous
                     if (currentWallpaperRL != null) {
                         try { mc.getTextureManager().release(currentWallpaperRL); } catch (Exception ignored) {}
                     }
@@ -541,14 +469,12 @@ public class FilesManager {
                 } catch (Throwable t) {
                     t.printStackTrace();
                     try {
-                        // no direct n reference here if failed earlier
                     } catch (Exception ignored) {}
                     currentWallpaperTexture = null;
                     currentWallpaperRL = null;
                 }
             });
         } else {
-            // Headless: create NativeImage synchronously
             try (ByteArrayInputStream bais = new ByteArrayInputStream(pngBytes)) {
                 NativeImage n = NativeImage.read(bais);
                 if (n != null) {
@@ -564,7 +490,6 @@ public class FilesManager {
     }
 
     private void loadCurrentWallpaper() {
-        // If solid color mode, nothing to load
         if (currentWallpaperIsColor) return;
 
         if (currentWallpaperName == null) return;
@@ -572,14 +497,12 @@ public class FilesManager {
         File file = new File(wallpapersDir, currentWallpaperName);
         if (!file.exists()) return;
 
-        // If GIF, handled elsewhere
         if (currentWallpaperIsGif) return;
 
         Minecraft mc = Minecraft.getInstance();
         if (mc != null) {
             mc.execute(() -> {
                 try {
-                    // Release previous
                     if (currentWallpaperRL != null) {
                         try { mc.getTextureManager().release(currentWallpaperRL); } catch (Exception ignored) {}
                         currentWallpaperRL = null;
@@ -589,7 +512,6 @@ public class FilesManager {
                         currentWallpaperTexture = null;
                     }
 
-                    // Read file bytes and register on client thread to create NativeImage safely
                     byte[] bytes = null;
                     try (FileInputStream fis = new FileInputStream(file)) {
                         bytes = fis.readAllBytes();
@@ -607,7 +529,6 @@ public class FilesManager {
                 }
             });
         } else {
-            // Fallback for headless/testing: do synchronous load
             try (FileInputStream fis = new FileInputStream(file)) {
                 NativeImage img = NativeImage.read(fis);
                 if (currentWallpaperTexture != null) try { currentWallpaperTexture.close(); } catch (Exception ignored) {}
@@ -620,15 +541,10 @@ public class FilesManager {
         }
     }
 
-    /**
-     * Returns the ResourceLocation for the currently registered wallpaper texture,
-     * or null if none (or if a solid color wallpaper is active).
-     */
     public ResourceLocation getCurrentWallpaperResource() {
         return currentWallpaperIsColor ? null : currentWallpaperRL;
     }
 
-    // Update getWallpaperPreviewResource to use byte-based registration (creates NativeImage on client thread)
     public ResourceLocation getWallpaperPreviewResource(String name) {
         if (name == null) return null;
         synchronized (wallpaperPreviews) {
@@ -637,16 +553,13 @@ public class FilesManager {
         File f = new File(wallpapersDir, name);
         if (!f.exists()) return null;
         try {
-            // Prepare a unique id for the preview
             String safe = name.replaceAll("[^a-zA-Z0-9_.-]", "_").toLowerCase(Locale.ROOT);
             String id = "pc_ui_wallpaper_preview_" + safe + "_" + f.lastModified();
 
             Minecraft mc = Minecraft.getInstance();
             if (mc != null) {
-                // Read bytes off-thread then register on client thread
                 byte[] fileBytes = null;
                 if (name.toLowerCase(Locale.ROOT).endsWith(".gif")) {
-                    // Read first frame only for preview
                     try (ImageInputStream iis = ImageIO.createImageInputStream(f)) {
                         Iterator<ImageReader> readers = ImageIO.getImageReaders(iis);
                         if (readers.hasNext()) {
@@ -667,7 +580,6 @@ public class FilesManager {
                     try {
                         if (registerBytes == null) return;
                         synchronized (wallpaperPreviews) { if (wallpaperPreviews.containsKey(name)) return; }
-                        // Create NativeImage on client thread and register
                         NativeImage ni = null;
                         try (ByteArrayInputStream bais = new ByteArrayInputStream(registerBytes)) {
                             ni = NativeImage.read(bais);
@@ -681,7 +593,6 @@ public class FilesManager {
                     }
                 });
             } else {
-                // Fallback: attempt synchronous registration (headless/testing)
                 try (FileInputStream fis = new FileInputStream(f)) {
                     byte[] bytes = fis.readAllBytes();
                     NativeImage img = NativeImage.read(new ByteArrayInputStream(bytes));
@@ -698,13 +609,11 @@ public class FilesManager {
             e.printStackTrace();
             return null;
         }
-        // If async registration is scheduled, return whatever is cached now (likely null)
         synchronized (wallpaperPreviews) {
             return wallpaperPreviews.get(name);
         }
     }
 
-    // New: load GIF frames and start animation
     private void loadGifAndStart(File gifFile) {
         clearCurrentWallpaperTexture();
         try (ImageInputStream iis = ImageIO.createImageInputStream(gifFile)) {
@@ -719,7 +628,7 @@ public class FilesManager {
             for (int i = 0; i < limit; i++) {
                 BufferedImage frame = reader.read(i);
                 frames.add(frame);
-                int delay = 100; // default 100ms
+                int delay = 100;
                 try {
                     IIOMetadata meta = reader.getImageMetadata(i);
                     int parsed = parseGifDelay(meta);
@@ -731,14 +640,12 @@ public class FilesManager {
             this.currentGifFrames = frames;
             this.currentGifDelays = delays;
             this.currentGifFrameIndex = 0;
-            // Immediately set first frame as texture using safe registration (use bytes)
             BufferedImage first = frames.get(0);
             byte[] bytes = bufferedImageToPngBytes(first);
             String safeName = gifFile.getName().replaceAll("[^a-zA-Z0-9_.-]", "_").toLowerCase(Locale.ROOT);
             String id = "pc_ui_wallpaper_current_" + safeName + "_" + gifFile.lastModified();
             registerImageBytesSafely(bytes, id + "_0");
 
-            // Start scheduling frames
             scheduleNextGifFrame();
         } catch (Exception e) {
             e.printStackTrace();
@@ -749,7 +656,6 @@ public class FilesManager {
     }
 
     private int parseGifDelay(IIOMetadata meta) {
-        // Attempt to parse delay from GIF metadata (javax_imageio_gif_image_1.0)
         if (meta == null) return -1;
         try {
             Node root = meta.getAsTree("javax_imageio_gif_image_1.0");
@@ -762,7 +668,7 @@ public class FilesManager {
                     if (delayNode != null) {
                         try {
                             int delayCentis = Integer.parseInt(delayNode.getNodeValue());
-                            return Math.max(10, delayCentis * 10); // convert to ms, minimum 10ms
+                            return Math.max(10, delayCentis * 10);
                         } catch (NumberFormatException ignored) {}
                     }
                 }
@@ -791,10 +697,8 @@ public class FilesManager {
             byte[] bytes = bufferedImageToPngBytes(bi);
             final String safeName = (currentWallpaperName != null ? currentWallpaperName : "gif").replaceAll("[^a-zA-Z0-9_.-]", "_").toLowerCase(Locale.ROOT);
             final String id = "pc_ui_wallpaper_current_" + safeName + "_" + System.currentTimeMillis() + "_" + currentGifFrameIndex;
-            // Register bytes on client thread
             registerImageBytesSafely(bytes, id);
 
-            // schedule next
             if (currentGifDelays != null && !currentGifDelays.isEmpty()) {
                 int nextDelay = currentGifDelays.get(currentGifFrameIndex);
                 if (gifTimer != null) gifTimer.schedule(new TimerTask() {
@@ -807,11 +711,8 @@ public class FilesManager {
         }
     }
 
-
-    // Desktop state classes
     public static class DesktopState {
         public List<DesktopIconState> icons;
-        // Persist wallpaper choices
         public String wallpaperName;
         public boolean wallpaperIsColor;
         public int wallpaperColor;
@@ -843,11 +744,9 @@ public class FilesManager {
     public void updateDesktopIconsFromRegistry() {
         desktopIcons.clear();
 
-        // Get all apps that should be on desktop from registry
         AppRegistry registry = AppRegistry.getInstance();
         for (String appName : registry.getDesktopApps()) {
             if (registry.isInstalled(appName)) {
-                // Add to desktop with default position
                 addDesktopIcon(appName,
                         (int) (Math.random() * 300) + 100,
                         (int) (Math.random() * 300) + 60);

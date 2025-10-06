@@ -20,7 +20,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 public class NotesApp implements IApp {
     private DraggableWindow window;
     private final AsyncTaskManager asyncManager = AsyncTaskManager.getInstance();
-    // use thread-safe list for cross-thread updates
     private final List<Note> notes = new CopyOnWriteArrayList<>();
     private Note selectedNote = null;
     private EditBox noteTitleInput;
@@ -35,7 +34,6 @@ public class NotesApp implements IApp {
         this.noteContentInput = new MultiLineEditor(Minecraft.getInstance().font);
         this.noteContentInput.setResponder((s) -> { if (selectedNote != null) selectedNote.content = s; });
 
-        // set responders so edits update the selected note in-memory
         this.noteTitleInput.setResponder((s) -> { if (selectedNote != null) selectedNote.title = s; });
 
         loadNotes();
@@ -65,18 +63,15 @@ public class NotesApp implements IApp {
                 }
             }
 
-            // If none exist, create default note
             if (tmp.isEmpty()) {
                 Note defaultNote = new Note("Welcome", "Welcome to Notes!\n\nCreate new notes by clicking the '+' button.\nYour notes are automatically saved.");
                 tmp.add(defaultNote);
-                // Save default note to disk
                 try {
                     File n = new File(notesDir, defaultNote.title + ".txt");
                     if (!n.exists()) try (FileWriter w = new FileWriter(n)) { w.write(defaultNote.content); }
                 } catch (IOException ignored) {}
             }
 
-            // Update UI on main thread
             asyncManager.executeOnMainThread(() -> {
                 notes.clear(); notes.addAll(tmp);
                 selectedNote = notes.isEmpty() ? null : notes.get(0);
@@ -95,7 +90,6 @@ public class NotesApp implements IApp {
             try (FileWriter writer = new FileWriter(noteFile)) {
                 writer.write(note.content == null ? "" : note.content);
             } catch (IOException ignored) {}
-            // refresh list on main thread
             asyncManager.executeOnMainThread(this::loadNotes);
         });
     }
@@ -121,20 +115,16 @@ public class NotesApp implements IApp {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16, ch = r[3] - 40;
 
-        // Header
         guiGraphics.fill(cx, cy, cx + cw, cy + 30, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFF0F0F0);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Notes"), cx + 10, cy + 8, DraggableWindow.textPrimaryColor(), false);
 
-        // New note button
         guiGraphics.fill(cx + cw - 80, cy + 5, cx + cw - 10, cy + 25, DraggableWindow.accentColorARGB);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("+ New"), cx + cw - 75, cy + 10, DraggableWindow.contrastingColorFor(DraggableWindow.accentColorARGB), false);
 
-        // Notes list (left panel)
         int listWidth = 200;
         guiGraphics.fill(cx, cy + 40, cx + listWidth, cy + ch, DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFFF8F8F8);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Your Notes"), cx + 10, cy + 45, DraggableWindow.textPrimaryColor(), false);
 
-        // List notes
         int noteY = cy + 65;
         for (Note note : notes) {
             boolean isSelected = selectedNote != null && selectedNote.title.equals(note.title);
@@ -150,12 +140,10 @@ public class NotesApp implements IApp {
             noteY += 25;
         }
 
-        // Note editor (right panel)
         if (selectedNote != null) {
             int editorX = cx + listWidth + 10;
             int editorWidth = cw - listWidth - 10;
 
-            // Title input
             guiGraphics.fill(editorX, cy + 40, editorX + editorWidth, cy + 70, DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFFF8F8F8);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Title:"), editorX + 5, cy + 45, DraggableWindow.textPrimaryColor(), false);
 
@@ -165,7 +153,6 @@ public class NotesApp implements IApp {
             noteTitleInput.setValue(selectedNote.title);
             noteTitleInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
 
-            // Content input
             guiGraphics.fill(editorX, cy + 75, editorX + editorWidth, cy + ch, DraggableWindow.darkTheme ? 0xFF1E1E1E : 0xFFFAFAFA);
 
             noteContentInput.setX(editorX + 5);
@@ -176,11 +163,9 @@ public class NotesApp implements IApp {
             noteContentInput.setValue(selectedNote.content);
             noteContentInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
 
-            // Save button
             guiGraphics.fill(editorX + editorWidth - 100, cy + 45, editorX + editorWidth - 10, cy + 65, DraggableWindow.accentColorARGB);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Save"), editorX + editorWidth - 85, cy + 50, DraggableWindow.contrastingColorFor(DraggableWindow.accentColorARGB), false);
 
-            // Delete button
             guiGraphics.fill(editorX + editorWidth - 200, cy + 45, editorX + editorWidth - 110, cy + 65, 0xFFF94144);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Delete"), editorX + editorWidth - 195, cy + 50, DraggableWindow.textPrimaryColor(), false);
         } else {
@@ -197,14 +182,12 @@ public class NotesApp implements IApp {
         int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16, ch = r[3] - 40;
         int listWidth = 200;
 
-        // New note button
         if (mouseRelX >= cx + cw - 80 && mouseRelX <= cx + cw - 10 &&
                 mouseRelY >= cy + 5 && mouseRelY <= cy + 25) {
             createNewNote();
             return true;
         }
 
-        // Notes list
         int noteY = cy + 65;
         for (Note note : notes) {
             if (mouseRelX >= cx && mouseRelX <= cx + listWidth &&
@@ -219,7 +202,6 @@ public class NotesApp implements IApp {
             int editorX = cx + listWidth + 10;
             int editorWidth = cw - listWidth - 10;
 
-            // Title input
             if (mouseRelX >= editorX + 50 && mouseRelX <= editorX + editorWidth - 60 &&
                     mouseRelY >= cy + 45 && mouseRelY <= cy + 65) {
                 noteTitleInput.setFocused(true);
@@ -228,10 +210,8 @@ public class NotesApp implements IApp {
                 return true;
             }
 
-            // Content input
             if (mouseRelX >= editorX + 5 && mouseRelX <= editorX + editorWidth - 10 &&
                     mouseRelY >= cy + 80 && mouseRelY <= cy + ch) {
-                // map click into content editor (use absolute coords as mouseRelX/Y are absolute)
                 noteContentInput.mouseClicked(mouseRelX, mouseRelY, button);
                 noteContentInput.setFocused(true);
                 contentFocused = true;
@@ -239,14 +219,12 @@ public class NotesApp implements IApp {
                 return true;
             }
 
-            // Save button
             if (mouseRelX >= editorX + editorWidth - 100 && mouseRelX <= editorX + editorWidth - 10 &&
                     mouseRelY >= cy + 45 && mouseRelY <= cy + 65) {
                 saveCurrentNote();
                 return true;
             }
 
-            // Delete button
             if (mouseRelX >= editorX + editorWidth - 200 && mouseRelX <= editorX + editorWidth - 110 &&
                     mouseRelY >= cy + 45 && mouseRelY <= cy + 65) {
                 deleteCurrentNote();
@@ -342,7 +320,6 @@ public class NotesApp implements IApp {
 
     @Override
     public boolean onClose(DraggableWindow window) {
-        // Save current note when closing
         if (selectedNote != null) {
             saveCurrentNote();
         }
@@ -352,7 +329,6 @@ public class NotesApp implements IApp {
     @Override
     public void tick() {}
 
-    // Simple MultiLineEditor (minimal) for NotesApp
     private static class MultiLineEditor {
         private final net.minecraft.client.gui.Font font;
         private int x, y, width, height;

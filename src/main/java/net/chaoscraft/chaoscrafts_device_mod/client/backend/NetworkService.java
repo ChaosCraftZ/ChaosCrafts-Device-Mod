@@ -17,11 +17,8 @@ public class NetworkService {
 
     public CompletableFuture<String> fetchUrl(String url) {
         return asyncManager.submitIOTask(() -> {
-            // Implementation for HTTP requests
-            // This would use HttpClient similar to BrowserApp
             return "Response from " + url;
         });
     }
 
-    // Other network-related methods
 }

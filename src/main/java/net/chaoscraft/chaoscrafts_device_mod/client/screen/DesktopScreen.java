@@ -32,7 +32,6 @@ public class DesktopScreen extends Screen {
     private final List<DraggableWindow> openApps = new ArrayList<>();
     private final int taskbarHeight = 28;
 
-    // icon drag / selection state
     private boolean selecting = false;
     private int selectStartX, selectStartY, selectEndX, selectEndY;
     private final LinkedHashSet<DesktopIcon> selectedIcons = new LinkedHashSet<>();
@@ -45,23 +44,19 @@ public class DesktopScreen extends Screen {
     private static final int ICON_GRID = 40;
     private static final float ICON_LERP = 0.18f;
 
-    // search results
     private final List<SearchResult> searchResults = new ArrayList<>();
     private static final int RESULT_HEIGHT = 28;
 
-    // Context menu
     private DesktopContextMenu contextMenu = null;
     private int iconSize = 32;
 
     private long lastTimeUpdate = 0;
     private String currentTime = "";
 
-    // Loading overlay (RiftOS)
     private boolean showLoadingOverlay = true;
     private final long loadingStartMillis = System.currentTimeMillis();
     private final java.util.List<LoadingParticle> loadingParticles = new java.util.ArrayList<>();
-    // animated progress & time state
-    private float currentLoadingProgress = 0f; // smoothed progress shown in UI
+    private float currentLoadingProgress = 0f;
     private long lastRenderMillis = System.currentTimeMillis();
     private static final long MIN_LOADING_MS = 5000;
     private static class LoadingParticle { float x,y,vx,vy,life; LoadingParticle(float x,float y,float vx,float vy,float life){this.x=x;this.y=y;this.vx=vx;this.vy=vy;this.life=life;} }
@@ -69,30 +64,24 @@ public class DesktopScreen extends Screen {
     private boolean showDebugInfo = false;
     private final AsyncTaskManager asyncManager = AsyncTaskManager.getInstance();
     private final java.util.Random rng = new java.util.Random();
-    // one-time logging to help diagnose missing icon resources
     private static final java.util.Set<String> missingIconLog = new java.util.HashSet<>();
 
-    // Key binding state
     private boolean ctrlPressed = false;
     private boolean shiftPressed = false;
 
-    // Inline renaming state
     private DesktopIcon renamingIcon = null;
     private EditBox renameBox = null;
 
-    // File system integration
     private final File desktopDir = new File(FilesManager.getPlayerDataDir(), "Desktop");
 
-    // --- Added sound & typing packet state ---
     private LaptopFanLoopSound fanLoopSound;
     private final java.util.Random soundRand = new java.util.Random();
     private long lastKeyTypeMillis = 0;
-    private static final long KEY_PACKET_COOLDOWN_MS = 55; // ms throttle for global typing packet
+    private static final long KEY_PACKET_COOLDOWN_MS = 55;
 
-    // new: block position of opened device
     private final BlockPos devicePos;
     private boolean fanStarted = false;
-    private static final int FAN_PREDELAY_TICKS = 30 * 20; // 30s silent pre-delay inside sound instance
+    private static final int FAN_PREDELAY_TICKS = 30 * 20;
 
     public DesktopScreen() { this(null); }
     public DesktopScreen(BlockPos devicePos) {
@@ -114,7 +103,6 @@ public class DesktopScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        // Ensure fan sound gets created only if experimental settings enabled
         if (!fanStarted && ConfigHandler.experimentalEnabled()) {
             try {
                 double fx, fy, fz;
@@ -151,8 +139,6 @@ public class DesktopScreen extends Screen {
         } catch (Exception e) {
             asyncManager.submitIOTask(this::refreshDesktopIcons);
         }
-
-        // remove immediate fan start; will start after delay
     }
 
     @Override
@@ -164,7 +150,6 @@ public class DesktopScreen extends Screen {
 
     @Override
     public void removed() {
-        // Extra safety: ensure fade-out also occurs if the screen is removed via setScreen or world change.
         if (fanLoopSound != null && fanStarted && !fanLoopSound.isFinished() && !fanLoopSound.isFadingOut()) {
             fanLoopSound.requestFadeOut();
         }
@@ -173,7 +158,6 @@ public class DesktopScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // wallpaper
         FilesManager fm = FilesManager.getInstance();
         if (fm != null && fm.isCurrentWallpaperColor()) {
             int color = fm.getCurrentWallpaperColor();
@@ -184,7 +168,6 @@ public class DesktopScreen extends Screen {
                 try {
                     guiGraphics.blit(texId, 0, 0, 0, 0, width, height, width, height);
                 } catch (Exception e) {
-                    // fallback to solid fill if texture fails
                     int bg = DraggableWindow.darkTheme ? 0xFF0F0F12 : 0xFF9AA6B2;
                     guiGraphics.fill(0, 0, width, height, bg);
                 }
@@ -196,18 +179,15 @@ public class DesktopScreen extends Screen {
 
         if (showDebugInfo) renderDebugInfo(guiGraphics);
 
-        // desktop icons
         for (DesktopIcon icon : desktopIcons) {
             icon.displayX = lerp(icon.displayX, icon.targetX, ICON_LERP);
             icon.displayY = lerp(icon.displayY, icon.targetY, ICON_LERP);
             icon.render(guiGraphics, mouseX, mouseY, selectedIcons.contains(icon), iconSize);
         }
 
-        // Update search box position every frame so its hitbox/focus are correct
         searchBox.setWidth(180);
         searchBox.setX(6); searchBox.setY(height - taskbarHeight + 4);
 
-        // windows rendering (below taskbar)
         for (DraggableWindow w : openApps) {
             if (!w.minimized || w.preview || w.closing) {
                 boolean focused = (w == (openApps.isEmpty() ? null : openApps.get(openApps.size() - 1)));
@@ -216,18 +196,15 @@ public class DesktopScreen extends Screen {
             }
         }
 
-        // loading overlay on top
         if (showLoadingOverlay) {
             long now = System.currentTimeMillis();
             long elapsed = now - loadingStartMillis;
             int w = width; int h = height;
 
-            // update animation timing
             long nowMs = System.currentTimeMillis();
             float deltaSec = (nowMs - lastRenderMillis) / 1000f;
             lastRenderMillis = nowMs;
 
-            // subtle vignetting gradient (top -> bottom)
             int topColor = 0xFF071018;
             int bottomColor = 0xFF0D1624;
             for (int i = 0; i < h; i++) {
@@ -238,15 +215,12 @@ public class DesktopScreen extends Screen {
                 guiGraphics.fill(0, i, w, i + 1, (0xFF << 24) | (rcol << 16) | (gcol << 8) | bcol);
             }
 
-            // slight dark overlay for contrast
             guiGraphics.fill(0, 0, w, h, 0x22000000);
 
-            // Center the loading group vertically to feel more balanced
             String title = "RiftOS";
             float titleScale = 2.0f;
-            int centerY = h / 2; // base center for the loading group
+            int centerY = h / 2;
 
-            // draw scaled title centered at centerY - 60
             int tw = font.width(title);
             guiGraphics.pose().pushPose();
             guiGraphics.pose().scale(titleScale, titleScale, 1f);
@@ -255,7 +229,6 @@ public class DesktopScreen extends Screen {
             drawShadowedString(guiGraphics, font, title, scaledX, scaledY);
             guiGraphics.pose().popPose();
 
-            // subtitle under title
             String baseSub = "Loading apps & settings";
             int dots = (int) ((elapsed / 450) % 4);
             String sub = baseSub + ".".repeat(Math.max(0, dots));
@@ -263,7 +236,6 @@ public class DesktopScreen extends Screen {
             int subY = centerY - 24;
             drawShadowedString(guiGraphics, font, sub, subX, subY);
 
-            // Progress bar (centered around centerY)
             float targetProg = Math.min(1f, (float) elapsed / (float) MIN_LOADING_MS);
             currentLoadingProgress = lerp(currentLoadingProgress, targetProg, 0.06f);
             int barW = Math.min(600, w - 160);
@@ -275,13 +247,11 @@ public class DesktopScreen extends Screen {
             guiGraphics.fill(bx, by, filled, by + barH, DraggableWindow.accentColorARGB);
             guiGraphics.fill(Math.max(bx, filled - 6), by, Math.min(bx + barW, filled + 6), by + barH, (DraggableWindow.accentColorARGB & 0x00FFFFFF) | 0x33FFFFFF);
 
-            // percentage: shadow then white
             String pct = String.format("%d%%", Math.round(currentLoadingProgress * 100f));
             int pctX = bx + (barW - font.width(pct)) / 2;
             int pctY = by + Math.max(0, (barH - 8) / 2);
             drawShadowedString(guiGraphics, font, pct, pctX, pctY);
 
-            // Particles (more varied and softer), spawn around the centered group
             synchronized (loadingParticles) {
                 if (loadingParticles.size() < 60 && rng.nextInt(4) == 0) {
                     float px = w / 2f + rng.nextInt(360) - 180;
@@ -310,17 +280,14 @@ public class DesktopScreen extends Screen {
                 }
             }
 
-            // Small footer hint
             String hint = "Press ESC to close";
             int hintX = w - font.width(hint) - 10;
             int hintY = h - 24;
             drawShadowedString(guiGraphics, font, hint, hintX, hintY);
 
-            // Keep overlay for minimum time
             return;
         }
 
-        // selection rect (soft fill + 1px lighter outline)
         if (selecting && !iconDragging) {
             int x0 = Math.min(selectStartX, selectEndX), y0 = Math.min(selectStartY, selectEndY);
             int x1 = Math.max(selectStartX, selectEndX), y1 = Math.max(selectStartY, selectEndY);
@@ -333,27 +300,20 @@ public class DesktopScreen extends Screen {
             guiGraphics.fill(x1 - 1, y0, x1, y1, outline);
         }
 
-        // update search results
         updateSearchResults();
 
-        // taskbar
         boolean hideTaskbar = false;
         if (!openApps.isEmpty()) hideTaskbar = openApps.get(openApps.size() - 1).exclusiveFullscreen;
         if (!hideTaskbar) {
             int tbY = height - taskbarHeight;
-            // position the search box but render it after drawing the taskbar background
             searchBox.setX(6); searchBox.setY(tbY + 4);
 
-            // taskbar base - semi-transparent greyish with subtle green undertone
-            int taskbarBase = 0xCC2B2F33; // more greyish, slightly transparent
+            int taskbarBase = 0xCC2B2F33;
             int topSheen = 0x22FFFFFF;
             guiGraphics.fill(0, tbY, width, height, taskbarBase);
-            // subtle top sheen strip
             guiGraphics.fill(0, tbY, width, tbY + 3, DraggableWindow.darkTheme ? topSheen : 0x22FFFFFF);
-            // soft shadow above the bar
             guiGraphics.fill(0, tbY - 2, width, tbY, 0x22000000);
 
-            // area reserved on right for system tray and stacked clock
             final int trayIconW = 28;
             final int trayIconH = 18;
             final int trayIconPad = 6;
@@ -365,8 +325,8 @@ public class DesktopScreen extends Screen {
             String dateStr = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("M/d/yyyy"));
             int timeW = font.width(timeStr);
             int dateW = font.width(dateStr);
-            int clockW = Math.max(timeW, dateW) + 12; // padding
-            int trayTotalWidth = iconsTotalW + clockW + 12; // extra spacing to right edge
+            int clockW = Math.max(timeW, dateW) + 12;
+            int trayTotalWidth = iconsTotalW + clockW + 12;
 
             int trayRightPadding = 10;
             int trayLeft = Math.max(6 + searchBox.getWidth() + 16, width - trayTotalWidth - trayRightPadding);
@@ -392,10 +352,8 @@ public class DesktopScreen extends Screen {
             drawShadowedString(guiGraphics, font, timeStr, clockLeft, timeY);
             drawShadowedString(guiGraphics, font, dateStr, clockLeft, dateY);
 
-            // render the search box on top so it is visible and receives input reliably
             try { searchBox.render(guiGraphics, mouseX, mouseY, partialTick); } catch (Exception ignored) {}
 
-            // Draw search results popup above the taskbar if there are results
             if (!searchBox.getValue().isEmpty() && !searchResults.isEmpty()) {
                 int popupW = Math.max(searchBox.getWidth(), 260);
                 int entries = Math.min(searchResults.size(), 6);
@@ -415,7 +373,6 @@ public class DesktopScreen extends Screen {
                     int iconSizePx = 20;
                     int iconX = popupX + 10;
 
-                    // Preferred: use icon passed with the SearchResult. If absent, attempt derived lookups.
                     ResourceLocation iconToUse = r.iconRes;
                     if (iconToUse == null) {
                         try {
@@ -435,7 +392,6 @@ public class DesktopScreen extends Screen {
                     int textX = popupX + 12 + iconSizePx + 6;
                     int availTextW = popupW - (textX - popupX) - 12;
                     if (font.width(label) > availTextW) label = font.plainSubstrByWidth(label, availTextW - 8) + "...";
-                    // draw label white with dark shadow so it stays legible on any theme
                     drawShadowedString(guiGraphics, font, label, textX, ry + 6);
                  }
              }
@@ -471,14 +427,12 @@ public class DesktopScreen extends Screen {
 
                 if (w.minimized) guiGraphics.fill(cx - 3, tbY + taskbarHeight - 8, cx + 3, tbY + taskbarHeight - 6, DraggableWindow.textSecondaryColor());
 
-                // hover tooltip for app name
                 if (hovered) {
                     String name = w.appName == null ? "<app>" : w.appName;
                     int nw = font.width(name) + 8;
                     int nx = Math.max(6, Math.min(width - nw - 6, cx - nw / 2));
                     int ny = tbY - 22;
                     guiGraphics.fill(nx, ny, nx + nw, ny + 16, DraggableWindow.darkTheme ? 0xEE222222 : 0xEEFFFFFF);
-                    // draw tooltip label using the white+shadow helper only
                     drawShadowedString(guiGraphics, font, name, nx + 4, ny + 3);
                 }
 
@@ -486,21 +440,17 @@ public class DesktopScreen extends Screen {
             }
         }
 
-        // context menu
         if (contextMenu != null) contextMenu.render(guiGraphics, mouseX, mouseY, partialTick);
 
-        // cleanup closed windows
         List<DraggableWindow> rem = new ArrayList<>(); for (DraggableWindow w : openApps) if (w.removeRequested) rem.add(w); openApps.removeAll(rem);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
-    // helper: decide if a window should appear on the taskbar
     private boolean isTaskbarEligible(DraggableWindow w) {
         if (w == null) return false;
         if (w.removeRequested || w.closing) return false;
         if (w.appName == null) return false;
-        // Normalize the display/title to the internal app id used by the registry/icon manager
         String normalized = normalizeAppNameForIcon(w.appName);
         if (normalized == null || normalized.isEmpty()) return false;
         if (normalized.equalsIgnoreCase("apps") || normalized.equalsIgnoreCase("launcher") || normalized.equalsIgnoreCase("system")) return false;
@@ -528,19 +478,16 @@ public class DesktopScreen extends Screen {
 
     private void updateSearchResults() {
         searchResults.clear(); String q = searchBox.getValue().trim().toLowerCase(); if (q.isEmpty()) return;
-        // Desktop icons
         for (DesktopIcon di : desktopIcons) {
             if (di.name.toLowerCase().contains(q)) {
                 String display = toTitleCase(di.name);
                 ResourceLocation icon = null;
                 try {
-                    // Try normalized id (most common)
                     String candidate = normalizeAppNameForIcon(di.name.replaceAll("\\.\\w+$", ""));
                     if (candidate != null && !candidate.isEmpty()) icon = IconManager.getIconResource(candidate);
                 } catch (Exception ignored) {
                     icon = null;
                 }
-                // fallback: try simple lowercase full name
                 if (icon == null) {
                     try {
                         icon = IconManager.getIconResource(di.name.toLowerCase());
@@ -551,7 +498,6 @@ public class DesktopScreen extends Screen {
                 searchResults.add(new SearchResult(display, icon, di.onClick));
             }
         }
-        // Open windows / apps
         for (DraggableWindow w : openApps) {
             String appNameForMatch = w.appName == null ? "" : w.appName;
             if (appNameForMatch.toLowerCase().contains(q)) {
@@ -564,9 +510,8 @@ public class DesktopScreen extends Screen {
 
     private static float lerp(float a, float b, float f) { return a + (b - a) * f; }
 
-    // Draw text with a dark shadow outline (always white main text)
     private static void drawShadowedString(GuiGraphics g, net.minecraft.client.gui.Font font, String text, int x, int y) {
-             int shadow = 0x66000000; // dark shadow
+             int shadow = 0x66000000;
              g.drawString(font, Component.literal(text), x + 1, y + 1, shadow, false);
              g.drawString(font, Component.literal(text), x - 1, y + 1, shadow, false);
              g.drawString(font, Component.literal(text), x + 1, y - 1, shadow, false);
@@ -610,12 +555,10 @@ public class DesktopScreen extends Screen {
     @Override
     public void tick () {
         super.tick();
-        // If experimental setting was turned off while open, immediately stop fan
         if (fanStarted && fanLoopSound != null && !ConfigHandler.experimentalEnabled() && !fanLoopSound.isFinished()) {
             fanLoopSound.requestFadeOut();
-            fanStarted = false; // prevent re-starting this session
+            fanStarted = false;
         }
-        // Removed delayed creation logic; fan handled entirely by pre-delay inside sound.
     }
 
     @Override
@@ -624,7 +567,6 @@ public class DesktopScreen extends Screen {
         searchBox.setX(6);
         searchBox.setY(height - taskbarHeight + 4);
         super.mouseClicked(mouseX, mouseY, button);
-        // Left click -> trackpad sound; Right click -> separate mouse click sound (context menu or other)
         if (button == 0) {
             try {
                 LaptopKeySoundManager.playTrackpadClick();
@@ -869,7 +811,7 @@ public class DesktopScreen extends Screen {
             shiftPressed = true;
             return true;
         }
-        if (keyCode == 32) { // spacebar
+        if (keyCode == 32) {
             try {
                 LaptopKeySoundManager.playKey(' ');
             } catch (Exception ignored) {
@@ -1102,7 +1044,6 @@ public class DesktopScreen extends Screen {
         }
     }
 
-    // adjust sendTypingPacketMaybe to include devicePos
     private void sendTypingPacketMaybe () {
         long now = System.currentTimeMillis();
         if (now - lastKeyTypeMillis >= KEY_PACKET_COOLDOWN_MS) {
@@ -1140,7 +1081,6 @@ public class DesktopScreen extends Screen {
             if (hover) g.fill(dx - 2, dy - 2, dx + iconSize + 2, dy + iconSize + 2, DraggableWindow.selectionOverlayColor());
             String displayName = toTitleCase(name);
             if (Minecraft.getInstance().font.width(displayName) > iconSize + 10) displayName = Minecraft.getInstance().font.plainSubstrByWidth(displayName, iconSize + 5) + "...";
-            // Use the shadowed white text helper to keep labels legible across themes
             drawShadowedString(g, Minecraft.getInstance().font, displayName, dx, dy + iconSize + 4);
         }
         boolean isInside(double mouseX, double mouseY, int currentIconSize) { return mouseX >= displayX && mouseX <= displayX + currentIconSize && mouseY >= displayY && mouseY <= displayY + currentIconSize; }

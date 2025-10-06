@@ -19,9 +19,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.concurrent.atomic.AtomicReference;
 
-/**
- * YouTube app with basic video playback capability
- */
+// currently useless
 public class YouTubeApp implements IApp {
     private DraggableWindow window;
     private EditBox urlInput;
@@ -42,25 +40,22 @@ public class YouTubeApp implements IApp {
         this.urlInput.setFocused(false);
         this.currentFrame = new BufferedImage(320, 240, BufferedImage.TYPE_INT_ARGB);
 
-        // Start frame update loop
         asyncManager.scheduleTask(this::frameUpdateLoop, 100, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     private void frameUpdateLoop() {
         if (isPlaying.get() && currentVideoId.get() != null) {
             long currentTime = System.currentTimeMillis();
-            if (currentTime - lastFrameUpdate > 100) { // Update every 100ms (~10fps)
+            if (currentTime - lastFrameUpdate > 100) {
                 lastFrameUpdate = currentTime;
                 frameCounter++;
 
-                // Try to load YouTube thumbnail periodically
                 if (frameCounter % 30 == 0 && currentVideoId.get() != null) {
                     loadYouTubeThumbnail(currentVideoId.get());
                 }
             }
         }
 
-        // Reschedule if the window is still open
         if (window != null) {
             asyncManager.scheduleTask(this::frameUpdateLoop, 100, java.util.concurrent.TimeUnit.MILLISECONDS);
         }
@@ -71,39 +66,30 @@ public class YouTubeApp implements IApp {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16;
 
-        // Header
         guiGraphics.fill(cx, cy, cx + cw, cy + 30, 0xFF2B2B2B);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("YouTube Player"), cx + 10, cy + 8, 0xFFFFFFFF, false);
 
-        // URL input box
         guiGraphics.fill(cx, cy + 40, cx + cw, cy + 70, 0xFF1E1E1E);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Video URL:"), cx + 6, cy + 48, 0xFFFFFFFF, false);
 
-        // Position and render the input box
         urlInput.setX(cx + 80);
         urlInput.setY(cy + 46);
         urlInput.setWidth(cw - 170);
         urlInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
 
-        // Load button
         guiGraphics.fill(cx + cw - 80, cy + 46, cx + cw - 10, cy + 62, 0xFFCC0000);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Load"), cx + cw - 70, cy + 48, 0xFFFFFFFF, false);
 
-        // Status message
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(statusMessage.get()), cx + 10, cy + 72, 0xFFCCCCCC, false);
 
-        // Video player area
         int playerY = cy + 90;
         int playerHeight = Math.min(240, (r[3] - 40 - 90) / 2);
         int playerWidth = cw;
 
         if (currentVideoId.get() != null) {
-            // Draw video player background
             guiGraphics.fill(cx, playerY, cx + playerWidth, playerY + playerHeight, 0xFF000000);
 
-            // Simulate video playback with a moving pattern
             if (isPlaying.get()) {
-                // Draw the video frame as a simple colored rectangle pattern
                 int blockSize = 10;
                 for (int y = 0; y < playerHeight; y += blockSize) {
                     for (int x = 0; x < playerWidth; x += blockSize) {
@@ -111,10 +97,10 @@ public class YouTubeApp implements IApp {
                         int color;
 
                         switch (colorIndex) {
-                            case 0: color = 0xFFFF0000; break; // Red
-                            case 1: color = 0xFF00FF00; break; // Green
-                            case 2: color = 0xFF0000FF; break; // Blue
-                            default: color = 0xFFFFFFFF; break; // White
+                            case 0: color = 0xFFFF0000; break;
+                            case 1: color = 0xFF00FF00; break;
+                            case 2: color = 0xFF0000FF; break;
+                            default: color = 0xFFFFFFFF; break;
                         }
 
                         guiGraphics.fill(cx + x, playerY + y, cx + x + blockSize, playerY + y + blockSize, color);
@@ -122,13 +108,10 @@ public class YouTubeApp implements IApp {
                 }
             }
 
-            // Video info
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Now Playing: " + currentVideoId.get()), cx + 10, playerY + 5, 0xFFFFFFFF, false);
 
-            // Playback controls
             int controlY = playerY + playerHeight - 30;
 
-            // Play/Pause button
             if (isPlaying.get()) {
                 guiGraphics.fill(cx + 10, controlY, cx + 50, controlY + 20, 0xFF555555);
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Pause"), cx + 15, controlY + 6, 0xFFFFFFFF, false);
@@ -137,20 +120,16 @@ public class YouTubeApp implements IApp {
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Play"), cx + 20, controlY + 6, 0xFFFFFFFF, false);
             }
 
-            // Stop button
             guiGraphics.fill(cx + 60, controlY, cx + 100, controlY + 20, 0xFF555555);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Stop"), cx + 70, controlY + 6, 0xFFFFFFFF, false);
 
-            // Open in browser button
             guiGraphics.fill(cx + cw - 110, controlY, cx + cw - 10, controlY + 20, 0xFFCC0000);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Open in Browser"), cx + cw - 105, controlY + 6, 0xFFFFFFFF, false);
         } else {
-            // Welcome message
             guiGraphics.fill(cx, playerY, cx + cw, playerY + playerHeight, 0xFF1E1E1E);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("YouTube Video Player"), cx + 10, playerY + 20, 0xFFFFFFFF, false);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Paste any YouTube URL above to play a video"), cx + 10, playerY + 40, 0xFFCCCCCC, false);
 
-            // Supported URL formats
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Supported formats:"), cx + 10, playerY + 70, 0xFFFFFFFF, false);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("- https://www.youtube.com/watch?v=VIDEO_ID"), cx + 20, playerY + 90, 0xFFCCCCCC, false);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("- https://youtu.be/VIDEO_ID"), cx + 20, playerY + 110, 0xFFCCCCCC, false);
@@ -159,18 +138,14 @@ public class YouTubeApp implements IApp {
     }
 
     private void loadYouTubeThumbnail(String videoId) {
-        // Try to load the YouTube thumbnail in a separate thread
         asyncManager.submitIOTask(() -> {
             try {
                 URL url = new URL("https://img.youtube.com/vi/" + videoId + "/hqdefault.jpg");
                 BufferedImage thumbnail = ImageIO.read(url);
                 if (thumbnail != null) {
-                    // Store the thumbnail but we won't use it in this simplified version
-                    // In a more advanced implementation, you could display this thumbnail
                     statusMessage.set("Loaded thumbnail for: " + videoId);
                 }
             } catch (IOException e) {
-                // Couldn't load thumbnail, continue with generated animation
             }
         });
     }
@@ -180,14 +155,12 @@ public class YouTubeApp implements IApp {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16;
 
-        // Load button
         if (mouseRelX >= cx + cw - 80 && mouseRelX <= cx + cw - 10 &&
                 mouseRelY >= cy + 46 && mouseRelY <= cy + 62) {
             loadVideo(urlInput.getValue());
             return true;
         }
 
-        // Check if clicking on the input box
         if (mouseRelX >= cx + 80 && mouseRelX <= cx + cw - 170 &&
                 mouseRelY >= cy + 46 && mouseRelY <= cy + 62) {
             urlInput.setFocused(true);
@@ -200,7 +173,6 @@ public class YouTubeApp implements IApp {
             int playerHeight = Math.min(240, (r[3] - 40 - 90) / 2);
             int controlY = playerY + playerHeight - 30;
 
-            // Play/Pause button
             if (mouseRelX >= cx + 10 && mouseRelX <= cx + 50 &&
                     mouseRelY >= controlY && mouseRelY <= controlY + 20) {
                 isPlaying.set(!isPlaying.get());
@@ -209,7 +181,6 @@ public class YouTubeApp implements IApp {
                 return true;
             }
 
-            // Stop button
             if (mouseRelX >= cx + 60 && mouseRelX <= cx + 100 &&
                     mouseRelY >= controlY && mouseRelY <= controlY + 20) {
                 isPlaying.set(false);
@@ -219,7 +190,6 @@ public class YouTubeApp implements IApp {
                 return true;
             }
 
-            // Open in browser button
             if (mouseRelX >= cx + cw - 110 && mouseRelX <= cx + cw - 10 &&
                     mouseRelY >= controlY && mouseRelY <= controlY + 20) {
                 openInBrowser("https://www.youtube.com/watch?v=" + currentVideoId.get());
@@ -227,7 +197,6 @@ public class YouTubeApp implements IApp {
             }
         }
 
-        // If clicking elsewhere, remove focus from input
         urlInput.setFocused(false);
         inputFocused = false;
 
@@ -240,7 +209,6 @@ public class YouTubeApp implements IApp {
             return;
         }
 
-        // Extract video ID from various URL formats
         String videoId = extractVideoId(input);
 
         if (videoId != null) {
@@ -249,7 +217,6 @@ public class YouTubeApp implements IApp {
             statusMessage.set("Playing video: " + videoId);
             frameCounter = 0;
 
-            // Try to load the YouTube thumbnail
             loadYouTubeThumbnail(videoId);
 
             Minecraft.getInstance().getSoundManager().play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1f));
@@ -259,10 +226,8 @@ public class YouTubeApp implements IApp {
     }
 
     private String extractVideoId(String input) {
-        // Remove any extra spaces
         input = input.trim();
 
-        // Pattern for standard YouTube URL
         Pattern pattern = Pattern.compile("^(https?://)?(www\\.)?(youtube\\.com/watch\\?v=|youtu\\.be/|youtube\\.com/embed/)([a-zA-Z0-9_-]{11})");
         Matcher matcher = pattern.matcher(input);
 
@@ -270,26 +235,22 @@ public class YouTubeApp implements IApp {
             return matcher.group(4);
         }
 
-        // Pattern for just the video ID (11 characters)
         if (input.matches("[a-zA-Z0-9_-]{11}")) {
             return input;
         }
 
-        // Pattern for YouTube share URL
         pattern = Pattern.compile("youtube\\.com/watch\\?v=([a-zA-Z0-9_-]{11})");
         matcher = pattern.matcher(input);
         if (matcher.find()) {
             return matcher.group(1);
         }
 
-        // Pattern for youtu.be URL
         pattern = Pattern.compile("youtu\\.be/([a-zA-Z0-9_-]{11})");
         matcher = pattern.matcher(input);
         if (matcher.find()) {
             return matcher.group(1);
         }
 
-        // Pattern for embed URL
         pattern = Pattern.compile("youtube\\.com/embed/([a-zA-Z0-9_-]{11})");
         matcher = pattern.matcher(input);
         if (matcher.find()) {
@@ -302,7 +263,6 @@ public class YouTubeApp implements IApp {
     private void openInBrowser(String url) {
         asyncManager.submitIOTask(() -> {
             try {
-                // Try to open the URL in the default browser
                 if (java.awt.Desktop.isDesktopSupported() && java.awt.Desktop.getDesktop().isSupported(java.awt.Desktop.Action.BROWSE)) {
                     java.awt.Desktop.getDesktop().browse(new URI(url));
                     statusMessage.set("Opening in browser: " + url);
@@ -337,7 +297,7 @@ public class YouTubeApp implements IApp {
     @Override
     public boolean keyPressed(DraggableWindow window, int keyCode, int scanCode, int modifiers) {
         if (urlInput != null && inputFocused) {
-            if (keyCode == 257) { // Enter key
+            if (keyCode == 257) {
                 loadVideo(urlInput.getValue());
                 return true;
             }
@@ -348,9 +308,8 @@ public class YouTubeApp implements IApp {
 
     @Override
     public boolean onClose(DraggableWindow window) {
-        // Clean up resources
         currentFrame = null;
-        this.window = null; // Stop the frame update loop
+        this.window = null;
         return true;
     }
 }

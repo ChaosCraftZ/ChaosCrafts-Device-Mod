@@ -17,10 +17,6 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.regex.Pattern;
 
-/**
- * Tiny text-only browser. Fetches HTML via HttpClient and strips tags for display.
- * Does not run JS/CSS.
- */
 public class BrowserApp implements IApp {
     private DraggableWindow window;
     private EditBox addressBox;
@@ -38,17 +34,13 @@ public class BrowserApp implements IApp {
         guiGraphics.fill(cx, cy, cx + cw, cy + 30, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFF0F0F0);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Address:"), cx + 6, cy + 8, DraggableWindow.textPrimaryColor(), false);
         if (addressBox == null) addressBox = new EditBox(Minecraft.getInstance().font, cx + 64, cy + 6, Math.max(80, cw - 160), 16, Component.literal("url"));
-        // set position every frame so internal layout matches
         addressBox.setX(cx + 64);
         addressBox.setY(cy + 6);
-        // render the address box — note: DesktopScreen delegates mouse/char/key to focused window -> this EditBox will receive input
         addressBox.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
 
-        // "Go" button
         guiGraphics.fill(cx + cw - 86, cy + 6, cx + cw - 66, cy + 22, DraggableWindow.darkTheme ? 0xFF666666 : 0xFF999999);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Go"), cx + cw - 82, cy + 8, DraggableWindow.textPrimaryColor(), false);
 
-        // content display
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(content), cx + 6, cy + 40, DraggableWindow.textPrimaryColor(), false);
     }
 
@@ -56,14 +48,11 @@ public class BrowserApp implements IApp {
     public boolean mouseClicked(DraggableWindow window, double mouseRelX, double mouseRelY, int button) {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16;
-        // Go button
         if (mouseRelX >= cx + cw - 86 && mouseRelX <= cx + cw - 66 && mouseRelY >= cy + 6 && mouseRelY <= cy + 22) {
             goTo(addressBox.getValue());
             return true;
         }
-        // forward click to addressBox so it gets focused / cursor set
         if (addressBox != null) {
-            // EditBox expects screen coordinates in many mappings; pass absolute values (DesktopScreen passes abs mouse)
             addressBox.mouseClicked(mouseRelX, mouseRelY, button);
         }
         return false;
@@ -85,7 +74,6 @@ public class BrowserApp implements IApp {
     }
 
     @Override public boolean onClose(DraggableWindow window) {
-        // No special cleanup required; allow window to close
         return true;
     }
 

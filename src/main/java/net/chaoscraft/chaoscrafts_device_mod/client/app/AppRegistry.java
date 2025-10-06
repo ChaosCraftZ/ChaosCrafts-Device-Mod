@@ -17,15 +17,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
-/**
- * Cleaned up AppRegistry:
- * - Centralized Gson instance and TypeToken constants.
- * - Use ConcurrentHashMap and concurrent key sets.
- * - Normalize internal names to lowercase (consistent and avoids duplicates).
- * - Consolidated file IO save methods and removed duplicated logic.
- * - Reduced noisy try/catch blocks (kept logging on failures).
- * - Minor API-preserving behavior changes (keeps same public signatures).
- */
 public class AppRegistry {
     private static final Logger LOGGER = LogManager.getLogger();
     private static volatile AppRegistry INSTANCE;
@@ -37,12 +28,10 @@ public class AppRegistry {
     private final File registryFile;
     private final File statusFile;
 
-    // thread-safe collections
     private final Map<String, AppInfo> allApps = new ConcurrentHashMap<>();
     private final Set<String> installedApps = ConcurrentHashMap.newKeySet();
     private final Set<String> desktopApps = ConcurrentHashMap.newKeySet();
 
-    // default apps are constant and case-insensitive (internal names stored lowercase)
     private static final Set<String> DEFAULT_APPS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             "browser", "calculator", "paint", "files", "settings", "youtube", "notepad", "marketplace"
     )));
@@ -55,13 +44,9 @@ public class AppRegistry {
         this.registryFile = new File(playerDir, "app_registry.json");
         this.statusFile = new File(playerDir, "app_status.json");
 
-        // Kick off background load and expose the future so others can wait
         this.loadFuture = asyncManager.submitIOTask(this::loadRegistry);
     }
 
-    /**
-     * Returns a future that completes once the registry has finished loading.
-     */
     public CompletableFuture<Void> getLoadedFuture() {
         return loadFuture;
     }
@@ -75,9 +60,6 @@ public class AppRegistry {
         return INSTANCE;
     }
 
-    /**
-     * Install with metadata. Returns a future that completes when the install finishes.
-     */
     public CompletableFuture<Void> installApp(String appName, String displayName, String description, String version) {
         Objects.requireNonNull(appName, "appName");
         final String key = normalize(appName);
@@ -91,15 +73,11 @@ public class AppRegistry {
                 refreshDesktopIfOpen();
                 LOGGER.info("Installed app: {}", key);
             } else {
-                // still persist metadata changes and registry
                 saveRegistryAsync();
             }
         });
     }
 
-    /**
-     * Basic install when only internal name is known.
-     */
     public CompletableFuture<Void> installApp(String appName) {
         Objects.requireNonNull(appName, "appName");
         final String key = normalize(appName);
@@ -188,21 +166,16 @@ public class AppRegistry {
         return new HashSet<>(desktopApps);
     }
 
-    /* -------------------- Internal helpers -------------------- */
-
     private void loadRegistry() {
         try {
-            // Load registry file
             if (registryFile.exists()) {
                 try (FileReader reader = new FileReader(registryFile)) {
                     Map<String, AppInfo> loaded = GSON.fromJson(reader, APP_MAP_TYPE);
                     if (loaded != null) {
-                        // normalize keys to lowercase to avoid duplicates
                         for (Map.Entry<String, AppInfo> e : loaded.entrySet()) {
                             String key = normalize(e.getKey());
                             AppInfo info = e.getValue();
                             if (info != null) {
-                                // ensure internalName stored normalized
                                 info.internalName = key;
                                 allApps.put(key, info);
                             }
@@ -211,10 +184,8 @@ public class AppRegistry {
                 }
             }
 
-            // Load installation status (installed / desktop)
             loadInstallationStatus();
 
-            // Ensure default apps exist and are marked installed + on desktop
             for (String d : DEFAULT_APPS) {
                 allApps.computeIfAbsent(d, k -> {
                     String display = capitalizeEachWord(k);
@@ -224,7 +195,6 @@ public class AppRegistry {
                 desktopApps.add(d);
             }
 
-            // Marketplace / extra entries
             Map<String, String> marketplace = new LinkedHashMap<>();
             marketplace.put("geometry dash", "A fun rhythm-based platformer");
             marketplace.put("home security", "Monitor your home security system");
@@ -241,11 +211,9 @@ public class AppRegistry {
                 });
             }
 
-            // Persist any changes discovered during load
             saveRegistryAsync();
             saveStatusAsync();
 
-            // Try to synchronize desktop icons with FilesManager
             try {
                 FilesManager.getInstance().updateDesktopIconsFromRegistry();
             } catch (Exception ignored) {
@@ -300,8 +268,8 @@ public class AppRegistry {
             FilesManager fm = FilesManager.getInstance();
             if (fm == null) return;
             if (!fm.hasDesktopIcon(appName)) {
-                int x = 150 + ThreadLocalRandom.current().nextInt(0, 301); // [150,450)
-                int y = 60 + ThreadLocalRandom.current().nextInt(0, 201);  // [60,260)
+                int x = 150 + ThreadLocalRandom.current().nextInt(0, 301);
+                int y = 60 + ThreadLocalRandom.current().nextInt(0, 201);
                 fm.addDesktopIcon(appName, x, y);
             }
         } catch (Exception e) {
@@ -356,7 +324,6 @@ public class AppRegistry {
         public String description;
         public String version;
 
-        // Default constructor for Gson
         public AppInfo() {}
 
         public AppInfo(String internalName, String displayName, String description, String version) {
@@ -371,7 +338,6 @@ public class AppRegistry {
         Set<String> installedApps;
         Set<String> desktopApps;
 
-        // Default constructor for Gson
         public AppStatus() {}
 
         public AppStatus(Set<String> installedApps, Set<String> desktopApps) {

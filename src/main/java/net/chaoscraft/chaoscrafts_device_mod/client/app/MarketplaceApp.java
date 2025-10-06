@@ -23,7 +23,6 @@ public class MarketplaceApp implements IApp {
     private boolean isScrolling = false;
     private int scrollbarHeight = 0;
     private int scrollbarY = 0;
-    // drag helpers for smooth dragging
     private int dragStartY = 0;
     private int dragStartOffset = 0;
     private final AsyncTaskManager asyncManager = AsyncTaskManager.getInstance();
@@ -40,17 +39,14 @@ public class MarketplaceApp implements IApp {
     private void initializeCategories() {
         categories.clear();
 
-        // Get all available apps from AppRegistry
         AppRegistry registry = AppRegistry.getInstance();
         List<AppRegistry.AppInfo> allApps = registry.getAllApps();
 
-        // Games category
         AppCategory gamesCategory = new AppCategory("Games", 0xFFE74C3C);
         AppCategory utilitiesCategory = new AppCategory("Utilities", 0xFF3498DB);
         AppCategory mediaCategory = new AppCategory("Media", 0xFF9B59B6);
 
         for (AppRegistry.AppInfo appInfo : allApps) {
-            // Skip default apps in marketplace (they're pre-installed)
             if (registry.isDefaultApp(appInfo.internalName)) continue;
 
             AppInfo marketplaceApp = new AppInfo(
@@ -62,7 +58,6 @@ public class MarketplaceApp implements IApp {
                     false
             );
 
-            // Categorize apps - FIXED: Use proper categorization logic
             switch (appInfo.internalName.toLowerCase()) {
                 case "geometry dash":
                     gamesCategory.addApp(marketplaceApp);
@@ -78,13 +73,11 @@ public class MarketplaceApp implements IApp {
                     utilitiesCategory.addApp(marketplaceApp);
                     break;
                 default:
-                    // For any other non-default apps, add to utilities
                     utilitiesCategory.addApp(marketplaceApp);
                     break;
             }
         }
 
-        // Add non-empty categories - FIXED: Always add all categories even if empty
         categories.add(gamesCategory);
         categories.add(utilitiesCategory);
         categories.add(mediaCategory);
@@ -94,7 +87,6 @@ public class MarketplaceApp implements IApp {
         installedApps.clear();
         AppRegistry registry = AppRegistry.getInstance();
 
-        // Add all non-default apps that are installed
         for (AppRegistry.AppInfo appInfo : registry.getAllApps()) {
             if (!registry.isDefaultApp(appInfo.internalName) && registry.isInstalled(appInfo.internalName)) {
                 installedApps.add(new AppInfo(
@@ -115,30 +107,24 @@ public class MarketplaceApp implements IApp {
         int cx = r[0] + 8, cy = r[1] + 32, cw = r[2] - 16, ch = r[3] - 40;
         this.visibleHeight = ch - 40;
 
-        // Header with navigation
         guiGraphics.fill(cx, cy, cx + cw, cy + 30, 0xFF2B2B2B);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Marketplace"), cx + 10, cy + 10, 0xFFFFFFFF, false);
 
-        // Navigation tabs
         int tabWidth = 80;
         int storeTabX = cx + cw - 160;
         int libraryTabX = cx + cw - 80;
 
-        // Store tab
         boolean storeSelected = currentSection.equals("Store");
         guiGraphics.fill(storeTabX, cy, storeTabX + tabWidth, cy + 30, storeSelected ? 0xFF4C7BD1 : 0xFF444444);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Store"), storeTabX + 20, cy + 10, 0xFFFFFFFF, false);
 
-        // Library tab
         boolean librarySelected = currentSection.equals("Library");
         guiGraphics.fill(libraryTabX, cy, libraryTabX + tabWidth, cy + 30, librarySelected ? 0xFF4C7BD1 : 0xFF444444);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Library"), libraryTabX + 20, cy + 10, 0xFFFFFFFF, false);
 
-        // Content area - apply scroll clipping
         int contentY = cy + 40;
         int contentHeight = ch - 40;
 
-        // Enable scissor test to clip content
         guiGraphics.enableScissor(cx, contentY, cx + cw, contentY + contentHeight);
 
         if (currentSection.equals("Store")) {
@@ -147,23 +133,18 @@ public class MarketplaceApp implements IApp {
             renderLibrary(guiGraphics, cx, contentY - scrollOffset, cw, contentHeight);
         }
 
-        // Disable scissor test
         guiGraphics.disableScissor();
 
-        // Scrollbar
         int totalHeight = getTotalContentHeight();
         if (totalHeight > contentHeight) {
-            // Calculate scrollbar dimensions
             float contentRatio = (float) contentHeight / totalHeight;
             scrollbarHeight = Math.max(20, (int) (contentHeight * contentRatio));
             int scrollTrackHeight = contentHeight - scrollbarHeight;
             float scrollRatio = (float) scrollOffset / (float) Math.max(1, (totalHeight - contentHeight));
             scrollbarY = contentY + (int) (scrollRatio * scrollTrackHeight);
 
-            // Draw scrollbar track
             guiGraphics.fill(cx + cw - 8, contentY, cx + cw - 2, contentY + contentHeight, 0xFF555555);
 
-            // Draw scrollbar thumb
             int scrollbarColor = isScrolling ? 0xFF888888 : 0xFF666666;
             guiGraphics.fill(cx + cw - 8, scrollbarY, cx + cw - 2, scrollbarY + scrollbarHeight, scrollbarColor);
         }
@@ -174,44 +155,35 @@ public class MarketplaceApp implements IApp {
         int categoryY = cy;
 
         for (AppCategory category : categories) {
-            // Skip empty categories
             if (category.apps.isEmpty()) continue;
 
-            // Draw category header
             guiGraphics.fill(categoryX, categoryY, categoryX + cw - 20, categoryY + 24, category.color);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(category.name), categoryX + 10, categoryY + 8, 0xFFFFFFFF, false);
 
-            // Draw apps in this category
             int appY = categoryY + 30;
             for (AppInfo app : category.apps) {
-                // Skip if app would be outside visible area
                 if (appY + 60 < cy || appY > cy + ch) {
                     appY += 70;
                     continue;
                 }
 
-                // App card
                 guiGraphics.fill(categoryX, appY, categoryX + cw - 20, appY + 60, 0xFF2B2B2B);
                 guiGraphics.fill(categoryX, appY, categoryX + 4, appY + 60, category.color);
 
-                // App name and description
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(app.displayName), categoryX + 15, appY + 8, 0xFFFFFFFF, false);
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(app.description), categoryX + 15, appY + 22, 0xFFCCCCCC, false);
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Version: " + app.version), categoryX + 15, appY + 34, 0xFF999999, false);
 
-                // Check if app is installed and on desktop
                 AppRegistry registry = AppRegistry.getInstance();
                 boolean isInstalled = registry.isInstalled(app.internalName);
                 boolean isOnDesktop = registry.isOnDesktop(app.internalName);
 
-                // Download button or status
                 DownloadTask download = downloads.get(app.internalName);
                 if (download != null) {
                     if (download.completed) {
                         guiGraphics.fill(categoryX + cw - 90, appY + 10, categoryX + cw - 30, appY + 40, 0xFF57C07D);
                         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Installed"), categoryX + cw - 85, appY + 20, 0xFFFFFFFF, false);
                     } else {
-                        // Download in progress
                         int progressWidth = (int) (60 * download.progress);
                         guiGraphics.fill(categoryX + cw - 90, appY + 10, categoryX + cw - 30, appY + 40, 0xFF555555);
                         guiGraphics.fill(categoryX + cw - 90, appY + 10, categoryX + cw - 90 + progressWidth, appY + 40, 0xFF4C7BD1);
@@ -221,16 +193,13 @@ public class MarketplaceApp implements IApp {
                     }
                 } else if (isInstalled) {
                     if (isOnDesktop) {
-                        // Installed and on desktop
                         guiGraphics.fill(categoryX + cw - 90, appY + 10, categoryX + cw - 30, appY + 40, 0xFF57C07D);
                         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Installed"), categoryX + cw - 85, appY + 20, 0xFFFFFFFF, false);
                     } else {
-                        // Installed but not on desktop
                         guiGraphics.fill(categoryX + cw - 90, appY + 10, categoryX + cw - 30, appY + 40, 0xFFFFA500);
                         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Add to Desktop"), categoryX + cw - 85, appY + 20, 0xFFFFFFFF, false);
                     }
                 } else {
-                    // Download button
                     guiGraphics.fill(categoryX + cw - 90, appY + 10, categoryX + cw - 30, appY + 40, 0xFF4C7BD1);
                     guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Install"), categoryX + cw - 85, appY + 20, 0xFFFFFFFF, false);
                 }
@@ -249,32 +218,26 @@ public class MarketplaceApp implements IApp {
         appY += 20;
 
         for (AppInfo app : installedApps) {
-            // Skip if app would be outside visible area
             if (appY + 60 < cy || appY > cy + ch) {
                 appY += 70;
                 continue;
             }
 
-            // App card
             guiGraphics.fill(cx + 10, appY, cx + cw - 20, appY + 60, 0xFF2B2B2B);
             guiGraphics.fill(cx + 10, appY, cx + 14, appY + 60, 0xFF4C7BD1);
 
-            // App name and description
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(app.displayName), cx + 25, appY + 8, 0xFFFFFFFF, false);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(app.description), cx + 25, appY + 22, 0xFFCCCCCC, false);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Version: " + app.version), cx + 25, appY + 34, 0xFF999999, false);
 
-            // Check if app is on desktop
             AppRegistry registry = AppRegistry.getInstance();
             boolean isOnDesktop = registry.isOnDesktop(app.internalName);
 
-            // Add to Desktop button if not already on desktop
             if (!isOnDesktop) {
                 guiGraphics.fill(cx + cw - 180, appY + 10, cx + cw - 100, appY + 40, 0xFF4C7BD1);
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Add to Desktop"), cx + cw - 175, appY + 20, 0xFFFFFFFF, false);
             }
 
-            // Uninstall button (only for non-default apps)
             guiGraphics.fill(cx + cw - 90, appY + 10, cx + cw - 30, appY + 40, 0xFFF94144);
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Uninstall"), cx + cw - 85, appY + 20, 0xFFFFFFFF, false);
 
@@ -303,20 +266,17 @@ public class MarketplaceApp implements IApp {
         int contentY = cy + 40;
         int contentHeight = visibleHeight;
 
-        // Check scrollbar click
         int totalHeight = getTotalContentHeight();
         if (totalHeight > contentHeight) {
             if (mouseRelX >= cx + cw - 8 && mouseRelX <= cx + cw - 2 &&
                     mouseRelY >= scrollbarY && mouseRelY <= scrollbarY + scrollbarHeight) {
                 isScrolling = true;
-                // remember drag starting values to compute offset deltas
                 dragStartY = (int) mouseRelY;
                 dragStartOffset = scrollOffset;
                 return true;
             }
         }
 
-        // Check navigation tabs
         int storeTabX = cx + cw - 160;
         int libraryTabX = cx + cw - 80;
 
@@ -332,7 +292,6 @@ public class MarketplaceApp implements IApp {
             return true;
         }
 
-        // Adjust mouse Y for scrolling
         double adjustedMouseY = mouseRelY + scrollOffset;
 
         if (currentSection.equals("Store")) {
@@ -344,7 +303,7 @@ public class MarketplaceApp implements IApp {
 
     private boolean handleStoreClick(double mouseRelX, double mouseRelY, int cx, int contentY, int cw) {
         int categoryX = cx + 10;
-        int categoryY = contentY; // renderStore used contentY as starting Y
+        int categoryY = contentY;
 
         for (AppCategory category : categories) {
             if (category.apps.isEmpty()) continue;
@@ -352,7 +311,6 @@ public class MarketplaceApp implements IApp {
             int headerY = categoryY;
             int appY = headerY + 30;
             for (AppInfo app : category.apps) {
-                // Check if download button was clicked
                 if (mouseRelX >= categoryX + cw - 90 && mouseRelX <= categoryX + cw - 30 &&
                         mouseRelY >= appY + 10 && mouseRelY <= appY + 40) {
 
@@ -361,11 +319,9 @@ public class MarketplaceApp implements IApp {
                     boolean isOnDesktop = registry.isOnDesktop(app.internalName);
 
                     if (!isInstalled && !downloads.containsKey(app.internalName)) {
-                        // Start download process
                         DownloadTask download = new DownloadTask(app.internalName, app.downloadTime);
                         downloads.put(app.internalName, download);
 
-                        // Start download thread using async manager
                         asyncManager.submitIOTask(() -> {
                             long startTime = System.currentTimeMillis();
                             while (System.currentTimeMillis() - startTime < app.downloadTime * 1000) {
@@ -375,7 +331,6 @@ public class MarketplaceApp implements IApp {
                             download.progress = 1.0f;
                             download.completed = true;
 
-                            // Register the app
                             AppRegistry.AppInfo appInfo = registry.getAppInfo(app.internalName);
                             if (appInfo != null) {
                                 registry.installApp(app.internalName, appInfo.displayName, appInfo.description, appInfo.version)
@@ -401,10 +356,8 @@ public class MarketplaceApp implements IApp {
                         });
 
                     } else if (isInstalled && !isOnDesktop) {
-                        // Add to desktop
                         registry.addToDesktop(app.internalName);
 
-                        // Refresh desktop if it's currently open
                         if (Minecraft.getInstance().screen instanceof DesktopScreen) {
                             asyncManager.executeOnMainThread(() -> {
                                 ((DesktopScreen) Minecraft.getInstance().screen).refreshDesktopIcons();
@@ -427,11 +380,9 @@ public class MarketplaceApp implements IApp {
         int appY = contentY + 20;
 
         for (AppInfo app : installedApps) {
-            // Check if add to desktop button was clicked
             if (mouseRelX >= cx + cw - 180 && mouseRelX <= cx + cw - 100 &&
                     mouseRelY >= appY + 10 && mouseRelY <= appY + 40) {
 
-                // Add to desktop
                 AppRegistry registry = AppRegistry.getInstance();
                 registry.addToDesktop(app.internalName);
 
@@ -443,18 +394,14 @@ public class MarketplaceApp implements IApp {
                 return true;
             }
 
-            // Check if uninstall button was clicked and app is not essential
             if (mouseRelX >= cx + cw - 90 && mouseRelX <= cx + cw - 30 &&
                     mouseRelY >= appY + 10 && mouseRelY <= appY + 40) {
 
-                // Unregister the app
                 AppRegistry registry = AppRegistry.getInstance();
                 registry.uninstallApp(app.internalName);
 
-                // Refresh installed apps list
                 refreshInstalledApps();
 
-                // Refresh desktop if it's currently open
                 if (Minecraft.getInstance().screen instanceof DesktopScreen) {
                     asyncManager.executeOnMainThread(() -> {
                         ((DesktopScreen) Minecraft.getInstance().screen).refreshDesktopIcons();
@@ -491,7 +438,6 @@ public class MarketplaceApp implements IApp {
 
     @Override
     public void mouseReleased(DraggableWindow window, double mouseRelX, double mouseRelY, int button) {
-        // Stop scrollbar dragging
         this.isScrolling = false;
     }
 
@@ -503,7 +449,6 @@ public class MarketplaceApp implements IApp {
         int contentY = cy + 40;
         int contentHeight = ch - 40;
 
-        // Allow scrolling when the mouse is anywhere inside the app window (not only the inner content area)
         if (mouseX < cx || mouseX > cx + cw || mouseY < cy || mouseY > cy + ch) return false;
 
         int totalHeight = getTotalContentHeight();
@@ -516,19 +461,16 @@ public class MarketplaceApp implements IApp {
 
     @Override
     public boolean keyPressed(DraggableWindow window, int keyCode, int scanCode, int modifiers) {
-        // MarketplaceApp does not use keyboard shortcuts; consume none.
         return false;
     }
 
     @Override
     public boolean charTyped(DraggableWindow window, char codePoint, int modifiers) {
-        // Marketplace doesn't accept typed characters
         return false;
     }
 
     @Override
     public boolean onClose(DraggableWindow window) {
-        // Allow closing and clear references
         this.window = null;
         return true;
     }

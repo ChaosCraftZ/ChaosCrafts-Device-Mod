@@ -25,19 +25,16 @@ public class CalendarApp implements IApp {
     private LocalDate currentDate = LocalDate.now();
     private List<CalendarEvent> events = new ArrayList<>();
 
-    // UI state for event dialogs
     private boolean showEventDialog = false;
     private LocalDate dialogDate = null;
     private EditBox eventTitleInput;
     private EditBox eventTimeInput;
 
-    // hover
     private int hoverCol = -1, hoverRow = -1;
 
     @Override
     public void onOpen(DraggableWindow window) {
         this.window = window;
-        // initialize inputs
         this.eventTitleInput = new EditBox(Minecraft.getInstance().font, 0, 0, 200, 16, Component.literal("Title"));
         this.eventTimeInput = new EditBox(Minecraft.getInstance().font, 0, 0, 120, 16, Component.literal("Time"));
         loadEvents();
@@ -81,7 +78,6 @@ public class CalendarApp implements IApp {
                     w.write(ev.date.toString() + "\n");
                     w.write(ev.time + "\n");
                 }
-                // refresh in-memory list
                 loadEvents();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -106,11 +102,9 @@ public class CalendarApp implements IApp {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16, ch = r[3] - 40;
 
-        // Header
         guiGraphics.fill(cx, cy, cx + cw, cy + 30, 0xFF2B2B2B);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Calendar"), cx + 10, cy + 8, 0xFFFFFFFF, false);
 
-        // Navigation buttons
         guiGraphics.fill(cx + cw - 160, cy + 5, cx + cw - 130, cy + 25, 0xFF555555);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("◀"), cx + cw - 155, cy + 10, 0xFFFFFFFF, false);
 
@@ -120,16 +114,13 @@ public class CalendarApp implements IApp {
         guiGraphics.fill(cx + cw - 80, cy + 5, cx + cw - 10, cy + 25, 0xFF4C7BD1);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Today"), cx + cw - 75, cy + 10, 0xFFFFFFFF, false);
 
-        // Month and year
         String monthYear = currentDate.format(DateTimeFormatter.ofPattern("MMMM yyyy"));
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(monthYear), cx + 100, cy + 10, 0xFFFFFFFF, false);
 
-        // Calendar grid
         int gridY = cy + 40;
         int cellWidth = cw / 7;
-        int cellHeight = (ch - 40) / 7; // match mouseClicked calculation
+        int cellHeight = (ch - 40) / 7;
 
-        // Day names
         String[] dayNames = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
         for (int i = 0; i < 7; i++) {
             int dayX = cx + i * cellWidth;
@@ -137,14 +128,12 @@ public class CalendarApp implements IApp {
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(dayNames[i]), dayX + 5, gridY + 5, 0xFFFFFFFF, false);
         }
 
-        // Calendar cells
         LocalDate firstOfMonth = currentDate.withDayOfMonth(1);
         int daysInMonth = currentDate.lengthOfMonth();
-        int dayOfWeek = firstOfMonth.getDayOfWeek().getValue() % 7; // 0 = Sunday, 6 = Saturday
+        int dayOfWeek = firstOfMonth.getDayOfWeek().getValue() % 7;
 
         int day = 1;
         hoverCol = -1; hoverRow = -1;
-        // compute mouse-relative to calendar origin
         int mx = mouseRelX, my = mouseRelY;
 
         for (int row = 0; row < 6; row++) {
@@ -152,18 +141,15 @@ public class CalendarApp implements IApp {
                 int cellX = cx + col * cellWidth;
                 int cellY = gridY + 20 + row * cellHeight;
 
-                // Only draw cells that are part of the current month
                 if ((row == 0 && col < dayOfWeek) || day > daysInMonth) {
                     guiGraphics.fill(cellX, cellY, cellX + cellWidth, cellY + cellHeight, 0xFF2B2B2B);
                     continue;
                 }
 
-                // Detect hover
                 if (mx >= cellX && mx <= cellX + cellWidth && my >= cellY && my <= cellY + cellHeight) {
                     hoverCol = col; hoverRow = row;
                 }
 
-                // Highlight current day
                 boolean isToday = currentDate.getMonth() == LocalDate.now().getMonth() &&
                         currentDate.getYear() == LocalDate.now().getYear() &&
                         day == LocalDate.now().getDayOfMonth();
@@ -174,15 +160,12 @@ public class CalendarApp implements IApp {
                     guiGraphics.fill(cellX, cellY, cellX + cellWidth, cellY + cellHeight, 0xFF2B2B2B);
                 }
 
-                // Draw hover overlay
                 if (hoverCol == col && hoverRow == row) {
                     guiGraphics.fill(cellX, cellY, cellX + cellWidth, cellY + cellHeight, 0x332B77FF);
                 }
 
-                // Draw day number
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(String.valueOf(day)), cellX + 5, cellY + 5, 0xFFFFFFFF, false);
 
-                // Draw events for this day
                 LocalDate cellDate = LocalDate.of(currentDate.getYear(), currentDate.getMonth(), day);
                 int eventY = cellY + 18;
                 for (CalendarEvent event : events) {
@@ -197,7 +180,6 @@ public class CalendarApp implements IApp {
             }
         }
 
-        // Upcoming events panel
         int eventsPanelX = cx;
         int eventsPanelY = gridY + 20 + 6 * cellHeight;
         int eventsPanelWidth = cw;
@@ -215,69 +197,59 @@ public class CalendarApp implements IApp {
             }
         }
 
-        // Render event dialog if active
-         if (showEventDialog && dialogDate != null) {
-             int dw = 320, dh = 140;
-             int dx = cx + (cw - dw) / 2;
-             int dy = cy + (ch - dh) / 2;
+        if (showEventDialog && dialogDate != null) {
+            int dw = 320, dh = 140;
+            int dx = cx + (cw - dw) / 2;
+            int dy = cy + (ch - dh) / 2;
 
-             guiGraphics.fill(dx, dy, dx + dw, dy + dh, 0xFF2B2B2B);
-             guiGraphics.fill(dx, dy, dx + dw, dy + 24, 0xFF4C7BD1);
-             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Events for " + dialogDate.toString()), dx + 10, dy + 8, 0xFFFFFFFF, false);
+            guiGraphics.fill(dx, dy, dx + dw, dy + dh, 0xFF2B2B2B);
+            guiGraphics.fill(dx, dy, dx + dw, dy + 24, 0xFF4C7BD1);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Events for " + dialogDate.toString()), dx + 10, dy + 8, 0xFFFFFFFF, false);
 
-             // existing events for day
-             int ey = dy + 32;
-             for (CalendarEvent ev : events) {
-                 if (ev.date.equals(dialogDate)) {
-                     guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(ev.time + " - " + ev.title), dx + 8, ey, 0xFFFFFFFF, false);
-                     // delete button
-                     guiGraphics.fill(dx + dw - 70, ey - 2, dx + dw - 10, ey + 12, 0xFFF94144);
-                     guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Del"), dx + dw - 60, ey, 0xFFFFFFFF, false);
-                     ey += 14;
-                 }
-             }
+            int ey = dy + 32;
+            for (CalendarEvent ev : events) {
+                if (ev.date.equals(dialogDate)) {
+                    guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(ev.time + " - " + ev.title), dx + 8, ey, 0xFFFFFFFF, false);
+                    guiGraphics.fill(dx + dw - 70, ey - 2, dx + dw - 10, ey + 12, 0xFFF94144);
+                    guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Del"), dx + dw - 60, ey, 0xFFFFFFFF, false);
+                    ey += 14;
+                }
+            }
 
-             // inputs
-             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Title:"), dx + 8, dy + dh - 72, 0xFFFFFFFF, false);
-             eventTitleInput.setX(dx + 50);
-             eventTitleInput.setY(dy + dh - 76);
-             eventTitleInput.setWidth(dw - 60);
-             // pass actual mouse coords so clicks and focus work correctly
-             eventTitleInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Title:"), dx + 8, dy + dh - 72, 0xFFFFFFFF, false);
+            eventTitleInput.setX(dx + 50);
+            eventTitleInput.setY(dy + dh - 76);
+            eventTitleInput.setWidth(dw - 60);
+            eventTitleInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
 
-             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Time:"), dx + 8, dy + dh - 48, 0xFFFFFFFF, false);
-             eventTimeInput.setX(dx + 50);
-             eventTimeInput.setY(dy + dh - 52);
-             eventTimeInput.setWidth(120);
-             // pass actual mouse coords so typing/click focuses correctly
-             eventTimeInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Time:"), dx + 8, dy + dh - 48, 0xFFFFFFFF, false);
+            eventTimeInput.setX(dx + 50);
+            eventTimeInput.setY(dy + dh - 52);
+            eventTimeInput.setWidth(120);
+            eventTimeInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
 
-             // add button
-             guiGraphics.fill(dx + dw - 110, dy + dh - 52, dx + dw - 30, dy + dh - 28, 0xFF4C7BD1);
-             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Add Event"), dx + dw - 100, dy + dh - 48, 0xFFFFFFFF, false);
-         }
-     }
+            guiGraphics.fill(dx + dw - 110, dy + dh - 52, dx + dw - 30, dy + dh - 28, 0xFF4C7BD1);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Add Event"), dx + dw - 100, dy + dh - 48, 0xFFFFFFFF, false);
+        }
+    }
 
-     @Override
-     public boolean mouseClicked(DraggableWindow window, double mouseRelX, double mouseRelY, int button) {
+    @Override
+    public boolean mouseClicked(DraggableWindow window, double mouseRelX, double mouseRelY, int button) {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16, ch = r[3] - 40;
 
-        // Previous month button
         if (mouseRelX >= cx + cw - 160 && mouseRelX <= cx + cw - 130 &&
                 mouseRelY >= cy + 5 && mouseRelY <= cy + 25) {
             currentDate = currentDate.minusMonths(1);
             return true;
         }
 
-        // Next month button
         if (mouseRelX >= cx + cw - 120 && mouseRelX <= cx + cw - 90 &&
                 mouseRelY >= cy + 5 && mouseRelY <= cy + 25) {
             currentDate = currentDate.plusMonths(1);
             return true;
         }
 
-        // Today button
         if (mouseRelX >= cx + cw - 80 && mouseRelX <= cx + cw - 10 &&
                 mouseRelY >= cy + 5 && mouseRelY <= cy + 25) {
             currentDate = LocalDate.now();
@@ -286,9 +258,8 @@ public class CalendarApp implements IApp {
 
         int gridY = cy + 40;
         int cellWidth = cw / 7;
-        int cellHeight = (ch - 40) / 7; // same as render
+        int cellHeight = (ch - 40) / 7;
 
-        // compute first day offset
         LocalDate firstOfMonth = currentDate.withDayOfMonth(1);
         int dayOfWeek = firstOfMonth.getDayOfWeek().getValue() % 7;
 
@@ -313,26 +284,20 @@ public class CalendarApp implements IApp {
             }
         }
 
-        // If event dialog open, handle its buttons (Add/Delete)
         if (showEventDialog && dialogDate != null) {
             int dw = 320, dh = 140;
             int dx = cx + (cw - dw) / 2;
             int dy = cy + (ch - dh) / 2;
-            // If click lands inside the dialog, route clicks to inputs first
             if (mouseRelX >= dx && mouseRelX <= dx + dw && mouseRelY >= dy && mouseRelY <= dy + dh) {
-                // Title input area
                 if (mouseRelX >= dx + 50 && mouseRelX <= dx + 50 + (dw - 60) && mouseRelY >= dy + dh - 76 && mouseRelY <= dy + dh - 56) {
                     eventTitleInput.mouseClicked(mouseRelX, mouseRelY, button);
                     return true;
                 }
-                // Time input area
                 if (mouseRelX >= dx + 50 && mouseRelX <= dx + 50 + 120 && mouseRelY >= dy + dh - 52 && mouseRelY <= dy + dh - 32) {
                     eventTimeInput.mouseClicked(mouseRelX, mouseRelY, button);
                     return true;
                 }
-                // clicking inside dialog but not on controls should not fall through
             }
-            // Add button
             if (mouseRelX >= dx + dw - 110 && mouseRelX <= dx + dw - 30 && mouseRelY >= dy + dh - 52 && mouseRelY <= dy + dh - 28) {
                 String title = eventTitleInput.getValue().trim();
                 String time = eventTimeInput.getValue().trim();
@@ -342,11 +307,8 @@ public class CalendarApp implements IApp {
                     showEventDialog = false;
                     return true;
                 } else {
-                    // notify user via status
-                    // no direct showStatus here; ignoring
                 }
             }
-            // delete buttons for existing events
             int ey = dy + 32;
             for (CalendarEvent ev : events) {
                 if (ev.date.equals(dialogDate)) {
@@ -357,7 +319,6 @@ public class CalendarApp implements IApp {
                     ey += 14;
                 }
             }
-            // clicking outside dialog closes it
             if (!(mouseRelX >= dx && mouseRelX <= dx + dw && mouseRelY >= dy && mouseRelY <= dy + dh)) {
                 showEventDialog = false;
             }
@@ -371,7 +332,6 @@ public class CalendarApp implements IApp {
 
     @Override
     public void mouseReleased(DraggableWindow window, double mouseRelX, double mouseRelY, int button) {
-        // Empty implementation
     }
 
     @Override
@@ -394,7 +354,6 @@ public class CalendarApp implements IApp {
             if (eventTitleInput.isFocused()) return eventTitleInput.keyPressed(keyCode, scanCode, modifiers);
             if (eventTimeInput.isFocused()) return eventTimeInput.keyPressed(keyCode, scanCode, modifiers);
 
-            // ESC closes dialog
             if (keyCode == 256) {
                 showEventDialog = false; dialogDate = null; return true;
             }
@@ -402,16 +361,18 @@ public class CalendarApp implements IApp {
         return false;
     }
 
-    @Override
-    public boolean onClose(DraggableWindow window) { return true; }
-
     private static class CalendarEvent {
-        String title;
-        LocalDate date;
-        String time;
-        String fileName;
+        public String title;
+        public LocalDate date;
+        public String time;
+        public String fileName;
 
-        CalendarEvent(String title, LocalDate date, String time) { this.title = title; this.date = date; this.time = time; this.fileName = null; }
-        CalendarEvent(String title, LocalDate date, String time, String fileName) { this.title = title; this.date = date; this.time = time; this.fileName = fileName; }
+        public CalendarEvent(String title, LocalDate date, String time) {
+            this(title, date, time, null);
+        }
+
+        public CalendarEvent(String title, LocalDate date, String time, String fileName) {
+            this.title = title; this.date = date; this.time = time; this.fileName = fileName;
+        }
     }
 }

@@ -7,6 +7,7 @@ import org.apache.logging.log4j.Logger;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+// NOTE: make it fully async for release
 public class AsyncTaskManager {
     private static final Logger LOGGER = LogManager.getLogger();
     private static AsyncTaskManager INSTANCE;
@@ -19,7 +20,6 @@ public class AsyncTaskManager {
     private long totalTasksExecuted = 0;
 
     private AsyncTaskManager() {
-        // I/O bound tasks (file operations, network requests)
         ioBoundExecutor = Executors.newFixedThreadPool(4, new ThreadFactory() {
             private final AtomicInteger counter = new AtomicInteger(0);
 
@@ -31,10 +31,8 @@ public class AsyncTaskManager {
             }
         });
 
-        // CPU bound tasks (image processing, calculations)
         cpuBoundExecutor = Executors.newWorkStealingPool();
 
-        // Scheduled tasks
         scheduledExecutor = Executors.newScheduledThreadPool(2, new ThreadFactory() {
             private final AtomicInteger counter = new AtomicInteger(0);
 
@@ -54,13 +52,9 @@ public class AsyncTaskManager {
         return INSTANCE;
     }
 
-    // Add this method to fix the error
     public ExecutorService getIoExecutor() {
         return ioBoundExecutor;
     }
-
-    // ... rest of the class remains the same ...
-
 
     public CompletableFuture<Void> submitIOTask(Runnable task) {
         activeTasks.incrementAndGet();
@@ -130,7 +124,6 @@ public class AsyncTaskManager {
         Minecraft.getInstance().execute(task);
     }
 
-    // Monitoring methods
     public int getActiveTaskCount() {
         return activeTasks.get();
     }

@@ -4,6 +4,7 @@ import java.io.*;
 import java.util.*;
 import net.minecraft.server.level.ServerPlayer;
 
+// for future usage
 public class CameraManager {
     private static CameraManager INSTANCE;
     private final Map<String, CameraInfo> cameras = new HashMap<>();
@@ -78,4 +79,3 @@ public class CameraManager {
         }
     }
 }
-

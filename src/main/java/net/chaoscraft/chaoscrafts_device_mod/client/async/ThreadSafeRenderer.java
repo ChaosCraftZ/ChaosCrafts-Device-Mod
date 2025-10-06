@@ -6,6 +6,7 @@ import net.chaoscraft.chaoscrafts_device_mod.client.screen.DraggableWindow;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+// for future usage currently its useless
 public class ThreadSafeRenderer {
     private final ConcurrentLinkedQueue<Runnable> renderQueue = new ConcurrentLinkedQueue<>();
 
