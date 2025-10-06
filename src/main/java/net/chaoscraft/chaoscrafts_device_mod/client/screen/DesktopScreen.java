@@ -291,9 +291,9 @@ public class DesktopScreen extends Screen {
         if (selecting && !iconDragging) {
             int x0 = Math.min(selectStartX, selectEndX), y0 = Math.min(selectStartY, selectEndY);
             int x1 = Math.max(selectStartX, selectEndX), y1 = Math.max(selectStartY, selectEndY);
-            int fillCol = ((DraggableWindow.accentColorARGB & 0x00FFFFFF) | (DraggableWindow.darkTheme ? 0x220000FF : 0x22FFFFFF));
+            int fillCol = DraggableWindow.selectionOverlayColor();
             guiGraphics.fill(x0, y0, x1, y1, fillCol);
-            int outline = DraggableWindow.darkTheme ? 0x88AAD8FF : 0x88000000;
+            int outline = (0x88 << 24) | (DraggableWindow.accentColorARGB & 0x00FFFFFF);
             guiGraphics.fill(x0, y0, x1, y0 + 1, outline);
             guiGraphics.fill(x0, y1 - 1, x1, y1, outline);
             guiGraphics.fill(x0, y0, x0 + 1, y1, outline);

@@ -41,7 +41,7 @@ public class DraggableWindow {
     }
 
     public static int selectionOverlayColor() {
-        return darkTheme ? 0x66FFFFFF : 0x66000000;
+        return 0x664C7BD1;
     }
 
     public static int contrastingColorFor(int backgroundColor) {
