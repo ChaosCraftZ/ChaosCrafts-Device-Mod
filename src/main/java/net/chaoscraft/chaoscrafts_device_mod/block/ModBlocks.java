@@ -17,10 +17,16 @@ public class ModBlocks {
             DeferredRegister.create(ForgeRegistries.BLOCKS, CDM.MOD_ID);
 
     public static final RegistryObject<Block> LAPTOP_BLACK = BLOCKS.register("laptop_black",
-            () -> new Laptop(BlockBehaviour.Properties.copy(Blocks.IRON_BARS).noOcclusion()));
+            () -> new Laptop(BlockBehaviour.Properties.copy(Blocks.OAK_PLANKS)
+                    .noOcclusion()
+                    .strength(2.0f, 3.0f)
+                    .sound(SoundType.METAL)));
 
     public static final RegistryObject<Block> LAPTOP_WHITE = BLOCKS.register("laptop_white",
-            () -> new Laptop(BlockBehaviour.Properties.copy(Blocks.IRON_BARS).noOcclusion()));
+            () -> new Laptop(BlockBehaviour.Properties.copy(Blocks.OAK_PLANKS)
+                    .noOcclusion()
+                    .strength(2.0f, 3.0f)
+                    .sound(SoundType.METAL)));
 
     private static <T extends Block> RegistryObject<T> registerBlock(String name, Supplier<T> block) {
         RegistryObject<T> toReturn = BLOCKS.register(name, block);

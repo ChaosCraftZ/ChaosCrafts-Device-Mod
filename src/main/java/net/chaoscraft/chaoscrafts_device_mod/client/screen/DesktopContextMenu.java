@@ -1,5 +1,6 @@
 package net.chaoscraft.chaoscrafts_device_mod.client.screen;
 
+import net.chaoscraft.chaoscrafts_device_mod.client.fs.FilesManager;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -50,13 +51,13 @@ public class DesktopContextMenu {
         MenuOption background = new MenuOption("Background", () -> {});
         background.submenu.add(new MenuOption("Pictures (open Files)", () -> desktop.openAppSingle("Files", 780, 520)));
         MenuOption solid = new MenuOption("Solid color", () -> {});
-        solid.submenu.add(new MenuOption("Black", () -> net.chaoscraft.chaoscrafts_device_mod.client.fs.FilesManager.getInstance().setCurrentWallpaperColor(0xFF000000)));
-        solid.submenu.add(new MenuOption("White", () -> net.chaoscraft.chaoscrafts_device_mod.client.fs.FilesManager.getInstance().setCurrentWallpaperColor(0xFFFFFFFF)));
-        solid.submenu.add(new MenuOption("Dark gray", () -> net.chaoscraft.chaoscrafts_device_mod.client.fs.FilesManager.getInstance().setCurrentWallpaperColor(0xFF2B2B2B)));
-        solid.submenu.add(new MenuOption("Blue", () -> net.chaoscraft.chaoscrafts_device_mod.client.fs.FilesManager.getInstance().setCurrentWallpaperColor(0xFF1E90FF)));
+        solid.submenu.add(new MenuOption("Black", () -> FilesManager.getInstance().setCurrentWallpaperColor(0xFF000000)));
+        solid.submenu.add(new MenuOption("White", () -> FilesManager.getInstance().setCurrentWallpaperColor(0xFFFFFFFF)));
+        solid.submenu.add(new MenuOption("Dark gray", () -> FilesManager.getInstance().setCurrentWallpaperColor(0xFF2B2B2B)));
+        solid.submenu.add(new MenuOption("Blue", () -> FilesManager.getInstance().setCurrentWallpaperColor(0xFF1E90FF)));
         solid.submenu.add(new MenuOption("Custom (use Settings)", () -> desktop.openSettingsApp()));
         background.submenu.add(solid);
-        background.submenu.add(new MenuOption("Clear wallpaper", () -> net.chaoscraft.chaoscrafts_device_mod.client.fs.FilesManager.getInstance().setCurrentWallpaperName(null)));
+        background.submenu.add(new MenuOption("Clear wallpaper", () -> FilesManager.getInstance().setCurrentWallpaperName(null)));
         options.add(background);
     }
 
@@ -76,8 +77,8 @@ public class DesktopContextMenu {
             MenuOption option = options.get(i);
             int optionY = y + i * 20;
 
-            boolean isHovered = mouseX >= x && mouseX <= x + width &&
-                    mouseY >= optionY && mouseY <= optionY + 20;
+            boolean isHovered = mouseX >= x && mouseX < x + width &&
+                    mouseY >= optionY && mouseY < optionY + 20;
 
             if (isHovered) {
                 hoveredOption = option;
@@ -102,6 +103,8 @@ public class DesktopContextMenu {
             if (!option.submenu.isEmpty()) {
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("▶"), x + width - 15, optionY + 6, 0xFFFFFFFF, false);
             }
+
+            DebugOverlay.drawHitbox(guiGraphics, x, optionY, x + width, optionY + 20, "menu:" + option.text);
         }
 
         if (openSubmenu != null) {
@@ -110,8 +113,8 @@ public class DesktopContextMenu {
                 int optionY = y + optionIndex * 20;
                 renderSubmenu(guiGraphics, openSubmenu, x + width, optionY, mouseX, mouseY);
 
-                if (mouseX >= x + width && mouseX <= x + width + 150 &&
-                        mouseY >= optionY && mouseY <= optionY + openSubmenu.submenu.size() * 20) {
+                if (mouseX >= x + width && mouseX < x + width + 150 + 1 &&
+                        mouseY >= optionY && mouseY < optionY + openSubmenu.submenu.size() * 20 + 1) {
                     mouseOverMenu = true;
                 }
             }
@@ -135,8 +138,8 @@ public class DesktopContextMenu {
             MenuOption option = parent.submenu.get(i);
             int optionY = y + i * 20;
 
-            boolean isHovered = mouseX >= x && mouseX <= x + width &&
-                    mouseY >= optionY && mouseY <= optionY + 20;
+            boolean isHovered = mouseX >= x && mouseX < x + width &&
+                    mouseY >= optionY && mouseY < optionY + 20;
 
             if (isHovered) {
                 hoveredSubmenuOption = option;
@@ -144,15 +147,20 @@ public class DesktopContextMenu {
             }
 
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(option.text), x + 5, optionY + 6, 0xFFFFFFFF, false);
+
+            DebugOverlay.drawHitbox(guiGraphics, x, optionY, x + width, optionY + 20, "submenu:" + option.text);
         }
     }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        int mx = (int) Math.round(mouseX);
+        int my = (int) Math.round(mouseY);
+
         for (int i = 0; i < options.size(); i++) {
             MenuOption option = options.get(i);
             int optionY = y + i * 20;
 
-            if (mouseX >= x && mouseX <= x + 180 && mouseY >= optionY && mouseY <= optionY + 20) {
+            if (mx >= x && mx < x + 180 && my >= optionY && my < optionY + 20) {
                 if (option.action != null && option.submenu.isEmpty()) {
                     option.action.run();
                     return true;
@@ -166,10 +174,10 @@ public class DesktopContextMenu {
             if (optionIndex >= 0) {
                 int optionY = y + optionIndex * 20;
 
-                if (mouseX >= x + 180 && mouseX <= x + 330 &&
-                        mouseY >= optionY && mouseY <= optionY + openSubmenu.submenu.size() * 20) {
+                if (mx >= x + 180 && mx < x + 180 + 150 + 1 &&
+                        my >= optionY && my < optionY + openSubmenu.submenu.size() * 20 + 1) {
 
-                    int subIndex = (int) ((mouseY - optionY) / 20);
+                    int subIndex = (int) ((my - optionY) / 20);
                     if (subIndex >= 0 && subIndex < openSubmenu.submenu.size()) {
                         MenuOption subOption = openSubmenu.submenu.get(subIndex);
                         if (subOption.action != null) {
@@ -185,7 +193,10 @@ public class DesktopContextMenu {
     }
 
     public boolean isMouseOver(double mouseX, double mouseY) {
-        if (mouseX >= x && mouseX <= x + 180 && mouseY >= y && mouseY <= y + options.size() * 20) {
+        int mx = (int) Math.round(mouseX);
+        int my = (int) Math.round(mouseY);
+
+        if (mx >= x && mx < x + 180 && my >= y && my < y + options.size() * 20) {
             return true;
         }
 
@@ -193,8 +204,8 @@ public class DesktopContextMenu {
             int optionIndex = options.indexOf(openSubmenu);
             if (optionIndex >= 0) {
                 int optionY = y + optionIndex * 20;
-                if (mouseX >= x + 180 && mouseX <= x + 330 &&
-                        mouseY >= optionY && mouseY <= optionY + openSubmenu.submenu.size() * 20) {
+                if (mx >= x + 180 && mx < x + 180 + 150 + 1 &&
+                        my >= optionY && my < optionY + openSubmenu.submenu.size() * 20 + 1) {
                     return true;
                 }
             }

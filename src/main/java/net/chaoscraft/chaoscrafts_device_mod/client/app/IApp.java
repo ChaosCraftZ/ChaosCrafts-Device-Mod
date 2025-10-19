@@ -17,4 +17,5 @@ public interface IApp {
 
     default void tick() {}
     default boolean mouseScrolled(double mouseX, double mouseY, double delta) { return false; }
+    default void debugRender(GuiGraphics guiGraphics, PoseStack poseStack, DraggableWindow window, int mouseRelX, int mouseRelY, float partialTick) {}
 }

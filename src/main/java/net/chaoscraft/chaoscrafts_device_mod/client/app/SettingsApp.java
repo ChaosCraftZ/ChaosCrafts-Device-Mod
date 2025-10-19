@@ -12,6 +12,8 @@ import net.chaoscraft.chaoscrafts_device_mod.client.async.AsyncTaskManager;
 import net.chaoscraft.chaoscrafts_device_mod.client.fs.FilesManager;
 import net.chaoscraft.chaoscrafts_device_mod.client.screen.DraggableWindow;
 import net.minecraft.resources.ResourceLocation;
+import net.chaoscraft.chaoscrafts_device_mod.ConfigHandler;
+import net.chaoscraft.chaoscrafts_device_mod.client.screen.DebugOverlay;
 
 import java.io.File;
 import java.io.FileReader;
@@ -232,6 +234,16 @@ public class SettingsApp implements IApp {
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Large Text"), mainX + 8, otherY + 22, DraggableWindow.textPrimaryColor(), false);
             boolean largeText = SETTINGS.containsKey("largeText") && (Boolean)SETTINGS.get("largeText") == true;
             int ltX = mainX + 220, ltY = otherY + 20; guiGraphics.fill(ltX, ltY, ltX+40, ltY+16, largeText ? DraggableWindow.accentColorARGB : 0xFF777777);
+            if (ConfigHandler.debugButtonsEnabled()) {
+                DebugOverlay.drawHitbox(guiGraphics, toggleX, toggleY, toggleX + toggleW, toggleY + toggleH, "toggle:darkMode");
+                DebugOverlay.drawHitbox(guiGraphics, accentColorInput.getX(), accentColorInput.getY(), accentColorInput.getX() + accentColorInput.getWidth(), accentColorInput.getY() + 16, "input:accentColor");
+                for (int i=0;i<accentPalette.length;i++){
+                    int sx = swX + i*(swSize+6);
+                    DebugOverlay.drawHitbox(guiGraphics, sx, swY, sx+swSize, swY+swSize, "swatch:"+i);
+                }
+                DebugOverlay.drawHitbox(guiGraphics, hcX, hcY, hcX+40, hcY+16, "toggle:highContrast");
+                DebugOverlay.drawHitbox(guiGraphics, ltX, ltY, ltX+40, ltY+16, "toggle:largeText");
+            }
 
             return;
         }
@@ -322,6 +334,9 @@ public class SettingsApp implements IApp {
 
                 boolean isSel = name.equals(selectedWallpaper) || (selectedWallpaper == null && name.equals(FilesManager.getInstance().getCurrentWallpaperName()));
                 if (isSel) guiGraphics.fill(drawX - 2, drawY - 2, drawX + scaledSize + 2, drawY + scaledSize + 2, DraggableWindow.selectionOverlayColor());
+                if (ConfigHandler.debugButtonsEnabled()) {
+                    DebugOverlay.drawHitbox(guiGraphics, drawX, drawY, drawX + scaledSize, drawY + scaledSize, "thumb:" + i);
+                }
             }
 
             int scrollbarX = previewX + 4;
@@ -333,6 +348,7 @@ public class SettingsApp implements IApp {
                 int handleW = Math.max(16, Math.round(thumbsVisibleW * viewRatio));
                 int handleX = scrollbarX + Math.round((thumbsVisibleW - handleW) * (thumbOffset / Math.max(1, maxOffset)));
                 guiGraphics.fill(handleX, scrollbarY, handleX + handleW, scrollbarY + scrollbarH, 0xFF555555);
+                if (ConfigHandler.debugButtonsEnabled()) DebugOverlay.drawHitbox(guiGraphics, handleX, scrollbarY, handleX + handleW, scrollbarY + scrollbarH, "scrollbar:handle");
             }
 
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Put PNG/JPG in chaoscrafts_device_mod/wallpapers"), mainX, scrollbarY + scrollbarH + 8, DraggableWindow.textSecondaryColor(), false);
@@ -347,6 +363,7 @@ public class SettingsApp implements IApp {
                 if (FilesManager.getInstance().isCurrentWallpaperColor() && (FilesManager.getInstance().getCurrentWallpaperColor() & 0x00FFFFFF) == (presets[i] & 0x00FFFFFF)) {
                     guiGraphics.fill(px - 2, sy - 2, px + 22, sy + 22, 0x66FFFFFF);
                 }
+                if (ConfigHandler.debugButtonsEnabled()) DebugOverlay.drawHitbox(guiGraphics, px, sy, px + 20, sy + 20, "preset:" + i);
             }
             return;
         }
@@ -400,16 +417,17 @@ public class SettingsApp implements IApp {
             }
             int otherY = accentY + 48;
             int hcX = mainX + 220, hcY = otherY - 2; if (mouseRelX >= hcX && mouseRelX <= hcX+40 && mouseRelY >= hcY && mouseRelY <= hcY+16) {
-                boolean cur = SETTINGS.containsKey("highContrast") && (Boolean)SETTINGS.get("highContrast") == true;
-                SETTINGS.put("highContrast", !cur); saveSettingsAsync(); return true; }
+                boolean highContrast = SETTINGS.containsKey("highContrast") && (Boolean)SETTINGS.get("highContrast") == true;
+                SETTINGS.put("highContrast", !highContrast);
+                saveSettingsAsync();
+                return true;
+            }
             int ltX = mainX + 220, ltY = otherY + 20; if (mouseRelX >= ltX && mouseRelX <= ltX+40 && mouseRelY >= ltY && mouseRelY <= ltY+16) {
-                boolean cur = SETTINGS.containsKey("largeText") && (Boolean)SETTINGS.get("largeText") == true;
-                SETTINGS.put("largeText", !cur); saveSettingsAsync(); return true; }
-
-            int aiX = mainX + 8, aiY = accentY + 14, aiW = 80, aiH = 16;
-            if (mouseRelX >= aiX && mouseRelX <= aiX+aiW && mouseRelY >= aiY && mouseRelY <= aiY+aiH) {
-                accentInputFocused = true; return true;
-            } else accentInputFocused = false;
+                boolean largeText = SETTINGS.containsKey("largeText") && (Boolean)SETTINGS.get("largeText") == true;
+                SETTINGS.put("largeText", !largeText);
+                saveSettingsAsync();
+                return true;
+            }
 
             return false;
         }

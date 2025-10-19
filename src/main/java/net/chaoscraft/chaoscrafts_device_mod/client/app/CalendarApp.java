@@ -99,8 +99,11 @@ public class CalendarApp implements IApp {
 
     @Override
     public void renderContent(GuiGraphics guiGraphics, PoseStack poseStack, DraggableWindow window, int mouseRelX, int mouseRelY, float partialTick) {
-        int[] r = window.getRenderRect(26);
-        int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16, ch = r[3] - 40;
+        int[] r = window.getAnimatedRenderRect(26);
+        int cx = Math.round(window.getDisplayX()) + 8;
+        int cy = Math.round(window.getDisplayY()) + 28;
+        int cw = r[2] - 16;
+        int ch = r[3] - 40;
 
         guiGraphics.fill(cx, cy, cx + cw, cy + 30, 0xFF2B2B2B);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Calendar"), cx + 10, cy + 8, 0xFFFFFFFF, false);
@@ -235,8 +238,11 @@ public class CalendarApp implements IApp {
 
     @Override
     public boolean mouseClicked(DraggableWindow window, double mouseRelX, double mouseRelY, int button) {
-        int[] r = window.getRenderRect(26);
-        int cx = r[0] + 8, cy = r[1] + 28, cw = r[2] - 16, ch = r[3] - 40;
+        int[] r = window.getAnimatedRenderRect(26);
+        int cx = Math.round(window.getDisplayX()) + 8;
+        int cy = Math.round(window.getDisplayY()) + 28;
+        int cw = r[2] - 16;
+        int ch = r[3] - 40;
 
         if (mouseRelX >= cx + cw - 160 && mouseRelX <= cx + cw - 130 &&
                 mouseRelY >= cy + 5 && mouseRelY <= cy + 25) {

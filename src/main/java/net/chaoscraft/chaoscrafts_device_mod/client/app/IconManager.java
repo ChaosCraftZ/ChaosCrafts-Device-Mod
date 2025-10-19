@@ -23,6 +23,7 @@ public class IconManager {
         ICON_MAP.put("paint", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/paint_icon.png"));
         ICON_MAP.put("settings", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/settings_icon.png"));
         ICON_MAP.put("youtube", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/youtube_icon.png"));
+        ICON_MAP.put("messenger", ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/icons/messenger_icon.png"));
     }
 
     public static ResourceLocation getIconResource(String appName) {

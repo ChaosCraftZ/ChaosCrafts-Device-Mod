@@ -3,6 +3,7 @@ package net.chaoscraft.chaoscrafts_device_mod.client.app;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.chaoscraft.chaoscrafts_device_mod.client.screen.DesktopScreen;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
@@ -44,6 +45,8 @@ public class FilesApp implements IApp {
 
     private File clipboardFile = null;
     private boolean isCutOperation = false;
+    private long lastClickTime = 0;
+    private File lastClickedFile = null;
 
     @Override
     public void onOpen(DraggableWindow window) {
@@ -73,6 +76,23 @@ public class FilesApp implements IApp {
             }
         }
     }
+    private File[] getFileArray() {
+        File[] files;
+        if (inSearchMode) {
+            files = searchResults.toArray(new File[0]);
+        } else {
+            File[] raw = currentDirectory.listFiles();
+            files = raw != null ? raw : new File[0];
+        }
+
+        Arrays.sort(files, (f1, f2) -> {
+            if (f1.isDirectory() && !f2.isDirectory()) return -1;
+            if (!f1.isDirectory() && f2.isDirectory()) return 1;
+            return f1.getName().compareToIgnoreCase(f2.getName());
+        });
+
+        return files;
+    }
 
     @Override
     public void renderContent(GuiGraphics guiGraphics, PoseStack poseStack, DraggableWindow window, int mouseRelX, int mouseRelY, float partialTick) {
@@ -100,7 +120,33 @@ public class FilesApp implements IApp {
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("⬆"), cx + cw - 35, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
         String path = getCurrentPath();
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(path), cx + 100, cy + 10, DraggableWindow.textPrimaryColor(), false);
+
+        int pathX = cx + 100;
+        int buttonsStartX = cx + cw - 120;
+        int padding = 8;
+        int maxWidthPx = buttonsStartX - pathX - padding;
+
+        String displayPath = path;
+        if (maxWidthPx <= 0) {
+            displayPath = "...";
+        } else {
+            com.mojang.blaze3d.vertex.PoseStack ps = null;
+            Font font = Minecraft.getInstance().font;
+            if (font.width(path) > maxWidthPx) {
+                String ell = "...";
+                int ellW = font.width(ell);
+                int maxRemain = Math.max(0, maxWidthPx - ellW);
+                int suffixLen = path.length();
+
+                while (suffixLen > 0 && font.width(path.substring(path.length() - suffixLen)) > maxRemain) {
+                    suffixLen--;
+                }
+                String suffix = suffixLen > 0 ? path.substring(path.length() - suffixLen) : "";
+                displayPath = ell + suffix;
+            }
+        }
+
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(displayPath), pathX, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
         guiGraphics.fill(cx, cy + 35, cx + 200, cy + 55, DraggableWindow.darkTheme ? 0xFF2B2B2B : 0xFFBFBFBF);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Search:"), cx + 5, cy + 40, DraggableWindow.textPrimaryColor(), false);
@@ -162,17 +208,9 @@ public class FilesApp implements IApp {
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Size"), cx + cw - 80, listY + 6, DraggableWindow.textPrimaryColor(), false);
 
         listY += 20;
-        File[] files = inSearchMode ?
-                searchResults.toArray(new File[0]) :
-                currentDirectory.listFiles();
+        File[] files = getFileArray();
 
         if (files != null) {
-            Arrays.sort(files, (f1, f2) -> {
-                if (f1.isDirectory() && !f2.isDirectory()) return -1;
-                if (!f1.isDirectory() && f2.isDirectory()) return 1;
-                return f1.getName().compareToIgnoreCase(f2.getName());
-            });
-
             for (File file : files) {
                 if (!showHiddenFiles && file.isHidden()) continue;
 
@@ -187,14 +225,38 @@ public class FilesApp implements IApp {
                     guiGraphics.fill(iconX, iconY, iconX + 16, iconY + 16, 0xFF8888FF);
                 }
 
+                int rowH = 18;
                 if (renaming && selectedFile != null && selectedFile.equals(file)) {
                     if (renameBox == null) {
-                        renameBox = new EditBox(Minecraft.getInstance().font, cx + 22, listY, 200, 16, Component.literal(file.getName()));
+                        int renameX = cx + 22;
+                        int renameW = Math.max(80, Math.min(300, cw - 44));
+                        int renameY = listY + (rowH - 16) / 2;
+                        renameBox = new EditBox(Minecraft.getInstance().font, renameX, renameY, renameW, 16, Component.literal(file.getName()));
                         renameBox.setValue(file.getName());
                         renameBox.setFocused(true);
                     }
-                    renameBox.render(guiGraphics, (int)mouseRelX, (int)mouseRelY, partialTick);
-                } else {
+                     int renameX = cx + 22;
+                     int renameY = listY + (rowH - 16) / 2;
+                     int renameW = renameBox.getWidth();
+
+                     int outlineColor = DraggableWindow.darkTheme ? 0xFF777777 : 0xFFDDDDDD;
+                     guiGraphics.fill(renameX, renameY, renameX + renameW, renameY + 1, outlineColor);
+                     guiGraphics.fill(renameX, renameY + 15, renameX + renameW, renameY + 16, outlineColor);
+                     guiGraphics.fill(renameX, renameY, renameX + 1, renameY + 16, outlineColor);
+                     guiGraphics.fill(renameX + renameW - 1, renameY, renameX + renameW, renameY + 16, outlineColor);
+
+                     String val = renameBox.getValue();
+                     Font font = Minecraft.getInstance().font;
+                     guiGraphics.drawString(font, Component.literal(val), renameX + 2, renameY + 2, DraggableWindow.textPrimaryColor(), false);
+
+                     int caretPos = renameBox.getCursorPosition();
+                     String prefix = val.substring(0, Math.max(0, Math.min(caretPos, val.length())));
+                     int caretX = renameX + 2 + font.width(prefix);
+                     boolean caretVisible = (System.currentTimeMillis() / 500) % 2 == 0;
+                     if (caretVisible) {
+                         guiGraphics.fill(caretX, renameY + 2, caretX + 1, renameY + 14, DraggableWindow.textPrimaryColor());
+                     }
+                 } else {
                     guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(file.getName()), cx + 22, listY + 3, DraggableWindow.textPrimaryColor(), false);
                 }
 
@@ -202,7 +264,7 @@ public class FilesApp implements IApp {
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(getFileType(file)), cx + cw - 180, listY + 3, DraggableWindow.textSecondaryColor(), false);
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(getFormattedSize(file)), cx + cw - 80, listY + 3, DraggableWindow.textSecondaryColor(), false);
 
-                listY += 20;
+                listY += rowH + 2;
             }
         }
     }
@@ -376,43 +438,61 @@ public class FilesApp implements IApp {
         }
 
         int listY = by + btnH + 8 + 20;
-        File[] files = inSearchMode ?
-                searchResults.toArray(new File[0]) :
-                currentDirectory.listFiles();
+        File[] files = getFileArray();
 
         if (files != null) {
             for (File file : files) {
                 if (!showHiddenFiles && file.isHidden()) continue;
 
+                int rowH = 18;
                 if (mouseRelX >= cx && mouseRelX <= cx + cw &&
-                        mouseRelY >= listY && mouseRelY <= listY + 18) {
+                        mouseRelY >= listY && mouseRelY <= listY + rowH) {
 
                     if (renaming && selectedFile != null && selectedFile.equals(file)) {
-                        finishRenaming();
-                    } else {
-                        selectedFile = file;
-                        renaming = false;
-
-                        if (button == 0 && System.currentTimeMillis() - lastClickTime < 500) {
-                            if (file.isDirectory()) {
-                                navigateTo(file);
-                            } else {
-                                openFileForEditing(file);
+                        if (renameBox != null) {
+                            int renameX = cx + 22;
+                            int renameW = Math.max(80, Math.min(300, cw - 44));
+                            int renameY = listY + (rowH - 16) / 2;
+                            int renameH = 16;
+                            if (mouseRelX >= renameX && mouseRelX <= renameX + renameW && mouseRelY >= renameY && mouseRelY <= renameY + renameH) {
+                                renameBox.mouseClicked(mouseRelX, mouseRelY, button);
+                                return true;
                             }
                         }
-                        lastClickTime = System.currentTimeMillis();
-                    }
-                    return true;
-                }
-                listY += 20;
-            }
-        }
+                        finishRenaming();
+                    } else {
+                         selectedFile = file;
+                         renaming = false;
 
-        return false;
-    }
+                         long now = System.currentTimeMillis();
+                         if (button == 0 && lastClickedFile != null && lastClickedFile.equals(file) && now - lastClickTime < 500) {
+                             if (file.isDirectory()) {
+                                 navigateTo(file);
+                             } else {
+                                 openFileForEditing(file);
+                             }
+
+                             lastClickedFile = null;
+                             lastClickTime = 0;
+
+                         } else {
+                             lastClickedFile = file;
+                             lastClickTime = now;
+                         }
+                     }
+                     return true;
+                 }
+                 listY += rowH + 2;
+              }
+          }
+
+         return false;
+     }
 
     private void navigateTo(File directory) {
         if (directory.isDirectory()) {
+            if (!isWithinPlayerDir(directory)) return;
+
             if (historyPointer < navigationHistory.size() - 1) {
                 navigationHistory.subList(historyPointer + 1, navigationHistory.size()).clear();
             }
@@ -427,28 +507,62 @@ public class FilesApp implements IApp {
     }
 
     private void navigateBack() {
-        if (historyPointer > 0) {
-            historyPointer--;
-            currentDirectory = navigationHistory.get(historyPointer);
-            selectedFile = null;
-            renaming = false;
+        int target = historyPointer - 1;
+        while (target >= 0) {
+            File cand = navigationHistory.get(target);
+            if (isWithinPlayerDir(cand)) {
+                historyPointer = target;
+                currentDirectory = cand;
+                selectedFile = null;
+                renaming = false;
+                return;
+            }
+            target--;
         }
     }
 
     private void navigateForward() {
-        if (historyPointer < navigationHistory.size() - 1) {
-            historyPointer++;
-            currentDirectory = navigationHistory.get(historyPointer);
-            selectedFile = null;
-            renaming = false;
+        int target = historyPointer + 1;
+        while (target < navigationHistory.size()) {
+            File cand = navigationHistory.get(target);
+            if (isWithinPlayerDir(cand)) {
+                historyPointer = target;
+                currentDirectory = cand;
+                selectedFile = null;
+                renaming = false;
+                return;
+            }
+            target++;
         }
     }
 
     private void navigateUp() {
         File parent = currentDirectory.getParentFile();
-        if (parent != null) {
+        if (parent != null && isWithinPlayerDir(parent)) {
             navigateTo(parent);
         }
+    }
+
+    private File getPlayerBaseDir() {
+        File base = FilesManager.getPlayerDataDir();
+        try {
+            return base.getCanonicalFile();
+        } catch (IOException e) {
+            return base.getAbsoluteFile();
+        }
+    }
+
+    private boolean isWithinPlayerDir(File dir) {
+        if (dir == null) return false;
+        try {
+            File cand = dir.getCanonicalFile();
+            File base = getPlayerBaseDir();
+            while (cand != null) {
+                if (cand.equals(base)) return true;
+                cand = cand.getParentFile();
+            }
+        } catch (IOException e) {}
+        return false;
     }
 
     private void createNewFolder() {
@@ -490,9 +604,7 @@ public class FilesApp implements IApp {
     private void startRenaming() {
         if (selectedFile == null) return;
         renaming = true;
-        renameBox = new EditBox(Minecraft.getInstance().font, 0, 0, 200, 16, Component.literal(selectedFile.getName()));
-        renameBox.setValue(selectedFile.getName());
-        renameBox.setFocused(true);
+        renameBox = null;
     }
 
     private void finishRenaming() {
@@ -688,6 +800,4 @@ public class FilesApp implements IApp {
     @Override
     public void tick() {
     }
-
-    private long lastClickTime = 0;
 }

@@ -1,6 +1,7 @@
 package net.chaoscraft.chaoscrafts_device_mod.client.app;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.chaoscraft.chaoscrafts_device_mod.ConfigHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
@@ -103,8 +104,11 @@ public class MarketplaceApp implements IApp {
 
     @Override
     public void renderContent(GuiGraphics guiGraphics, PoseStack poseStack, DraggableWindow window, int mouseRelX, int mouseRelY, float partialTick) {
-        int[] r = window.getRenderRect(26);
-        int cx = r[0] + 8, cy = r[1] + 32, cw = r[2] - 16, ch = r[3] - 40;
+        int[] r = window.getAnimatedRenderRect(26);
+        int cx = Math.round(window.getDisplayX()) + 8;
+        int cy = Math.round(window.getDisplayY()) + 32;
+        int cw = r[2] - 16;
+        int ch = r[3] - 40;
         this.visibleHeight = ch - 40;
 
         guiGraphics.fill(cx, cy, cx + cw, cy + 30, 0xFF2B2B2B);
@@ -124,8 +128,13 @@ public class MarketplaceApp implements IApp {
 
         int contentY = cy + 40;
         int contentHeight = ch - 40;
+        float uiScale = ConfigHandler.uiScaleFactor();
+        int physCX = Math.round(cx * uiScale);
+        int physContentY = Math.round(contentY * uiScale);
+        int physRight = Math.round((cx + cw) * uiScale);
+        int physBottom = Math.round((contentY + contentHeight) * uiScale);
 
-        guiGraphics.enableScissor(cx, contentY, cx + cw, contentY + contentHeight);
+        guiGraphics.enableScissor(physCX, physContentY, physRight, physBottom);
 
         if (currentSection.equals("Store")) {
             renderStore(guiGraphics, cx, contentY - scrollOffset, cw, contentHeight);
@@ -260,8 +269,9 @@ public class MarketplaceApp implements IApp {
 
     @Override
     public boolean mouseClicked(DraggableWindow window, double mouseRelX, double mouseRelY, int button) {
-        int[] r = window.getRenderRect(26);
-        int cx = r[0] + 8, cy = r[1] + 32;
+        int[] r = window.getAnimatedRenderRect(26);
+        int cx = Math.round(window.getDisplayX()) + 8;
+        int cy = Math.round(window.getDisplayY()) + 32;
         int cw = r[2] - 16;
         int contentY = cy + 40;
         int contentHeight = visibleHeight;

@@ -1,11 +1,14 @@
 package net.chaoscraft.chaoscrafts_device_mod;
 
 import com.mojang.logging.LogUtils;
+import net.chaoscraft.chaoscrafts_device_mod.backend.CameraManager;
 import net.chaoscraft.chaoscrafts_device_mod.block.ModBlocks;
 import net.chaoscraft.chaoscrafts_device_mod.block.entity.ModBlockEntities;
+import net.chaoscraft.chaoscrafts_device_mod.block.entity.client.LaptopRenderer;
 import net.chaoscraft.chaoscrafts_device_mod.item.ModCreativeModTabs;
 import net.chaoscraft.chaoscrafts_device_mod.item.ModItems;
 import net.chaoscraft.chaoscrafts_device_mod.sound.ModSounds;
+import net.minecraft.client.renderer.blockentity.BlockEntityRenderers;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.api.distmarker.Dist;
@@ -64,9 +67,10 @@ public class CDM {
         NetworkHandler.registerMessage(CameraPackets.CameraCaptureRequest.class, CameraPackets.CameraCaptureRequest::encode, CameraPackets.CameraCaptureRequest::decode, CameraPackets.CameraCaptureRequest::handle);
         NetworkHandler.registerMessage(CameraPackets.CameraSnapshot.class, CameraPackets.CameraSnapshot::encode, CameraPackets.CameraSnapshot::decode, CameraPackets.CameraSnapshot::handle);
         NetworkHandler.registerMessage(LaptopTypingPacket.class, LaptopTypingPacket::encode, LaptopTypingPacket::decode, LaptopTypingPacket::handle);
+        NetworkHandler.registerMessengerPackets();
 
         try {
-            net.chaoscraft.chaoscrafts_device_mod.backend.CameraManager.getInstance();
+            CameraManager.getInstance();
         } catch (Exception e) {
             LOGGER.warn("Failed to init CameraManager: " + e.getMessage());
         }
@@ -89,7 +93,7 @@ public class CDM {
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
             try {
-                net.minecraft.client.renderer.blockentity.BlockEntityRenderers.register(ModBlockEntities.LAPTOP_ENTITY.get(), net.chaoscraft.chaoscrafts_device_mod.block.entity.client.LaptopRenderer::new);
+                BlockEntityRenderers.register(ModBlockEntities.LAPTOP_ENTITY.get(), LaptopRenderer::new);
             } catch (Exception ignored) {}
 
             try {

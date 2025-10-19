@@ -8,6 +8,7 @@ import net.minecraft.network.chat.Component;
 import net.chaoscraft.chaoscrafts_device_mod.client.app.IApp;
 
 import net.chaoscraft.chaoscrafts_device_mod.client.async.AsyncTaskManager;
+import net.chaoscraft.chaoscrafts_device_mod.ConfigHandler;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -28,6 +29,11 @@ public class DraggableWindow {
     private float displayX, displayY;
     private float opacity = 1f, targetOpacity = 1f;
     private int dragOffsetX, dragOffsetY;
+
+    public int previewX = 0, previewY = 0, previewW = 0, previewH = 0;
+
+    public float previewOpacity = 0f;
+    public float previewTargetOpacity = 0f;
 
     public static boolean darkTheme = true;
     public static int accentColorARGB = 0xFF4C7BD1;
@@ -83,7 +89,8 @@ public class DraggableWindow {
         opacity = lerp(opacity, targetOpacity, 0.18f);
 
         if (closing && opacity < 0.03f) { removeRequested = true; return; }
-        if (minimized && !preview && !closing) return;
+
+        if (minimized && !closing) return;
 
         int alpha = Math.round(255 * opacity) & 0xFF;
         int bgBase = darkTheme ? 0x222222 : 0xFFFFFFFF;
@@ -91,8 +98,9 @@ public class DraggableWindow {
 
         int titleColor = ((alpha << 24) | (accentColorARGB & 0x00FFFFFF));
 
-        int fullW = Minecraft.getInstance().getWindow().getGuiScaledWidth();
-        int fullH = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+        float uiScale = ConfigHandler.uiScaleFactor();
+        int fullW = Math.round(Minecraft.getInstance().getWindow().getGuiScaledWidth() / uiScale);
+        int fullH = Math.round(Minecraft.getInstance().getWindow().getGuiScaledHeight() / uiScale);
 
         int renderX, renderY, renderW, renderH;
         if (exclusiveFullscreen) {
@@ -133,45 +141,163 @@ public class DraggableWindow {
         guiGraphics.fill(renderX + renderW - 68, btnY, renderX + renderW - 56, btnY + 14, accentWithAlpha);
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("▢"), renderX + renderW - 65, btnY, contrastingColorFor(accentWithAlpha), false);
 
+        DebugOverlay.drawHitbox(guiGraphics, renderX + renderW - 20, btnY, renderX + renderW - 8, btnY + 14, "btn:close");
+        DebugOverlay.drawHitbox(guiGraphics, renderX + renderW - 44, btnY, renderX + renderW - 32, btnY + 14, "btn:minimize");
+        DebugOverlay.drawHitbox(guiGraphics, renderX + renderW - 68, btnY, renderX + renderW - 56, btnY + 14, "btn:maximize");
+
         if (app != null && !minimized) {
             try {
                 app.tick();
             } catch (Exception ignored) {}
-            app.renderContent(guiGraphics, poseStack, this, mouseX, mouseY, partialTick);
+
+            guiGraphics.pose().pushPose();
+
+            int scissorX = renderX;
+            int scissorY = renderY + 26;
+            int scissorWidth = renderW;
+            int scissorHeight = renderH - 26;
+
+            float animatedScissorX = displayX;
+            float animatedScissorY = displayY + 26;
+            float animatedScissorWidth = renderW;
+            float animatedScissorHeight = renderH - 26;
+
+            int px0 = Math.round(animatedScissorX * uiScale);
+            int py0 = Math.round(animatedScissorY * uiScale);
+            int px1 = Math.round((animatedScissorX + animatedScissorWidth) * uiScale);
+            int py1 = Math.round((animatedScissorY + animatedScissorHeight) * uiScale);
+
+            guiGraphics.enableScissor(px0, py0, px1, py1);
+
+            guiGraphics.pose().pushPose();
+            guiGraphics.pose().translate(displayX - renderX, displayY - renderY, 0);
+
+            int animatedMouseX = mouseX - Math.round(displayX);
+            int animatedMouseY = mouseY - Math.round(displayY);
+
+            app.renderContent(guiGraphics, poseStack, this, animatedMouseX, animatedMouseY, partialTick);
+
+            try { app.debugRender(guiGraphics, poseStack, this, animatedMouseX, animatedMouseY, partialTick); } catch (Exception ignored) {}
+
+            guiGraphics.pose().popPose();
+            guiGraphics.disableScissor();
+            guiGraphics.pose().popPose();
         }
     }
 
+    public void drawPreview(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        if (!preview || previewW <= 0 || previewH <= 0 || previewOpacity <= 0.02f) return;
+        int px = previewX, py = previewY, pw = previewW, ph = previewH;
+        int alpha = Math.round(255 * previewOpacity) & 0xFF;
+        int shadowAlpha = Math.round(alpha * 0.25f);
+        guiGraphics.fill(px - 4, py - 4, px + pw + 4, py + ph + 4, (shadowAlpha << 24) | 0x000000);
+        int bgBase = darkTheme ? 0x222222 : 0xFFFFFFFF;
+        int bgColor = ((alpha << 24) | (bgBase & 0x00FFFFFF));
+        guiGraphics.fill(px, py, px + pw, py + ph, bgColor);
+        int titleColor = ((alpha << 24) | (accentColorARGB & 0x00FFFFFF));
+        int titleH = Math.max(18, (int)(pw * 0.12f));
+        guiGraphics.fill(px, py, px + pw, py + titleH, titleColor);
+        int textColor = contrastingColorFor(accentColorARGB);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(appName), px + 6, py + 4, textColor, false);
+
+        int innerTop = py + titleH + 4;
+        int innerLeft = px + 4;
+        int innerRight = px + pw - 4;
+        int innerBottom = py + ph - 4;
+        if (innerRight <= innerLeft || innerBottom <= innerTop) return;
+
+        int innerW = innerRight - innerLeft;
+        int innerH = innerBottom - innerTop;
+
+        if (app == null) {
+            int innerBg = ((alpha << 24) | (darkTheme ? 0xFF1B1B1B : 0xFFEFEFEF));
+            guiGraphics.fill(innerLeft, innerTop, innerRight, innerBottom, innerBg);
+            int hintColor = contrastingColorFor(innerBg);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Click to open"), innerLeft + 6, innerTop + 6, hintColor, false);
+            return;
+        }
+
+        int contentW = Math.max(1, this.width);
+        int contentH = Math.max(1, this.height - 26);
+
+        float scaleX = (float) innerW / (float) contentW;
+        float scaleY = (float) innerH / (float) contentH;
+        float scale = Math.min(scaleX, scaleY);
+        if (scale <= 0f) scale = 0.0001f;
+
+        int scaledW = Math.round(contentW * scale);
+        int scaledH = Math.round(contentH * scale);
+        float offsetX = (innerW - scaledW) * 0.5f;
+        float offsetY = (innerH - scaledH) * 0.5f;
+
+        float uiScale = ConfigHandler.uiScaleFactor();
+        int scX0 = Math.round((innerLeft + offsetX) * uiScale);
+        int scY0 = Math.round((innerTop + offsetY) * uiScale);
+        int scX1 = Math.round((innerLeft + offsetX + scaledW) * uiScale);
+        int scY1 = Math.round((innerTop + offsetY + scaledH) * uiScale);
+
+        int innerBg = ((alpha << 24) | (darkTheme ? 0xFF1B1B1B : 0xFFEFEFEF));
+        guiGraphics.fill(innerLeft, innerTop, innerRight, innerBottom, innerBg);
+
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().translate(innerLeft + offsetX, innerTop + offsetY, 0f);
+        guiGraphics.pose().scale(scale, scale, 1f);
+
+        try {
+            guiGraphics.enableScissor(scX0, scY0, scX1, scY1);
+            try {
+                int localMouseX = -10000;
+                int localMouseY = -10000;
+
+                app.renderContent(guiGraphics, guiGraphics.pose(), this, localMouseX, localMouseY, partialTick);
+
+                try { app.debugRender(guiGraphics, guiGraphics.pose(), this, localMouseX, localMouseY, partialTick); } catch (Exception ignored) {}
+            } finally {
+                guiGraphics.disableScissor();
+            }
+        } catch (Exception e) {
+            int hintColor = contrastingColorFor(innerBg);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Click to open"), innerLeft + 6, innerTop + 6, hintColor, false);
+        }
+
+        guiGraphics.pose().popPose();
+    }
 
     public int[] getRenderRect(int taskbarHeight) {
-        int fullW = Minecraft.getInstance().getWindow().getGuiScaledWidth();
-        int fullH = Minecraft.getInstance().getWindow().getGuiScaledHeight();
+        float uiScale = ConfigHandler.uiScaleFactor();
+        int fullW = Math.round(Minecraft.getInstance().getWindow().getGuiScaledWidth() / uiScale);
+        int fullH = Math.round(Minecraft.getInstance().getWindow().getGuiScaledHeight() / uiScale);
         if (exclusiveFullscreen) return new int[]{0, 0, fullW, fullH};
         if (maximized) return new int[]{0, 0, fullW, Math.max(0, fullH - taskbarHeight)};
         return new int[]{Math.round(displayX), Math.round(displayY), width, height};
     }
+
     @SuppressWarnings("unused")
     public boolean handleTitlebarClick(double mouseX, double mouseY, int button, int taskbarHeight) {
         int[] r = getRenderRect(taskbarHeight);
         int renderX = r[0], renderY = r[1], renderW = r[2];
-        if (mouseX >= renderX + renderW - 20 && mouseX <= renderX + renderW - 8 && mouseY >= renderY + 6 && mouseY <= renderY + 20) {
+        int mx = Math.round((float) mouseX);
+        int my = Math.round((float) mouseY);
+
+        if (mx >= renderX + renderW - 20 && mx < renderX + renderW - 8 && my >= renderY + 6 && my < renderY + 20) {
             requestClose();
             return true;
         }
 
-        if (mouseX >= renderX + renderW - 44 && mouseX <= renderX + renderW - 32 && mouseY >= renderY + 6 && mouseY <= renderY + 20) {
+        if (mx >= renderX + renderW - 44 && mx < renderX + renderW - 32 && my >= renderY + 6 && my < renderY + 20) {
             minimized = true;
             targetOpacity = 0f;
             return true;
         }
 
-        if (mouseX >= renderX + renderW - 68 && mouseX <= renderX + renderW - 56 && mouseY >= renderY + 6 && mouseY <= renderY + 20) {
+        if (mx >= renderX + renderW - 68 && mx < renderX + renderW - 56 && my >= renderY + 6 && my < renderY + 20) {
             maximized = !maximized;
             if (maximized) { x = 0; y = 0; }
             dragging = false;
             return true;
         }
 
-        if (!maximized && !exclusiveFullscreen && mouseX >= renderX && mouseX <= renderX + renderW && mouseY >= renderY && mouseY <= renderY + 26) {
+        if (!maximized && !exclusiveFullscreen && mx >= renderX && mx < renderX + renderW && my >= renderY && my < renderY + 26) {
             dragging = true;
             dragOffsetX = (int) (mouseX - x);
             dragOffsetY = (int) (mouseY - y);
@@ -187,8 +313,8 @@ public class DraggableWindow {
 
     public void mouseDragged(double mouseX, double mouseY) {
         if (dragging && !maximized && !exclusiveFullscreen && !closing) {
-            x = (int) (mouseX - dragOffsetX);
-            y = (int) (mouseY - dragOffsetY);
+            x = (int) Math.round(mouseX - dragOffsetX);
+            y = (int) Math.round(mouseY - dragOffsetY);
         } else if (app != null) {
             app.mouseDragged(this, mouseX, mouseY, 0, 0);
         }
@@ -214,7 +340,9 @@ public class DraggableWindow {
     public boolean isInside(double mouseX, double mouseY, int taskbarHeight) {
         int[] r = getRenderRect(taskbarHeight);
         int rx = r[0], ry = r[1], rw = r[2], rh = r[3];
-        return mouseX >= rx && mouseX <= rx + rw && mouseY >= ry && mouseY <= ry + rh;
+        int mx = Math.round((float) mouseX);
+        int my = Math.round((float) mouseY);
+        return mx >= rx && mx < rx + rw && my >= ry && my < ry + rh;
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
@@ -239,9 +367,44 @@ public class DraggableWindow {
         this.targetOpacity = 0f;
     }
 
+    public void setPreviewActive(boolean active) {
+        if (active) {
+            this.preview = true;
+            this.previewTargetOpacity = 1f;
+        } else {
+            this.previewTargetOpacity = 0f;
+        }
+    }
+
+    public void updatePreviewAnimation(float partialTick) {
+        previewOpacity = previewOpacity + (previewTargetOpacity - previewOpacity) * 0.25f;
+        if (previewTargetOpacity <= 0f && previewOpacity < 0.02f) {
+            preview = false;
+            previewW = previewH = 0;
+        }
+    }
+
     public static void closeAllWindows() {
         for (DraggableWindow w : ALL_WINDOWS) {
             if (w != null) w.requestClose();
         }
+    }
+
+
+    public float getDisplayX() {
+        return displayX;
+    }
+
+    public float getDisplayY() {
+        return displayY;
+    }
+
+    public int[] getAnimatedRenderRect(int taskbarHeight) {
+        float uiScale = ConfigHandler.uiScaleFactor();
+        int fullW = Math.round(Minecraft.getInstance().getWindow().getGuiScaledWidth() / uiScale);
+        int fullH = Math.round(Minecraft.getInstance().getWindow().getGuiScaledHeight() / uiScale);
+        if (exclusiveFullscreen) return new int[]{0, 0, fullW, fullH};
+        if (maximized) return new int[]{0, 0, fullW, Math.max(0, fullH - taskbarHeight)};
+        return new int[]{Math.round(displayX), Math.round(displayY), width, height};
     }
 }
