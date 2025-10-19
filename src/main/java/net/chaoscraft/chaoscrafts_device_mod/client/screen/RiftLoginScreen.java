@@ -336,8 +336,8 @@ public class RiftLoginScreen extends Screen {
         int tileInner = 0x22000000;
 
         if (showTile || showSignIn) {
-            roundedRectUI(gui, tileX, tileY, tileW, tileH, tileRadius, tileBg);
-            roundedRectUI(gui, tileX + 1, tileY + 1, tileW - 2, tileH - 2, tileRadius - 1, tileInner);
+            gui.fill(tileX, tileY, tileX + tileW, tileY + tileH, tileBg);
+            gui.fill(tileX + 1, tileY + 1, tileX + tileW - 1, tileY + tileH - 1, tileInner);
 
             int avSize = 48;
             int avX = tileX + 12;
@@ -361,6 +361,18 @@ public class RiftLoginScreen extends Screen {
                 }
 
             } catch (Exception ignored) {}
+
+            int textX = avX + avSize + 12;
+            int rightPadding = 12;
+            int textMaxWidth = tileX + tileW - rightPadding - textX;
+            String nameToShow = displayName != null ? displayName : "Player";
+            String emailToShow = email != null ? email : "";
+            String nameClipped = clipText(font, nameToShow, Math.max(0, textMaxWidth));
+            String emailClipped = clipText(font, emailToShow, Math.max(0, textMaxWidth));
+            int nameY = avY + (avSize - font.lineHeight * 2) / 2;
+            int emailY = nameY + font.lineHeight;
+            drawString(gui, font, nameClipped, textX, nameY, 0xFFFFFFFF);
+            drawString(gui, font, emailClipped, textX, emailY, 0x99FFFFFF);
         }
 
         if (transition > 0.01f || closingTransition) {
@@ -855,6 +867,25 @@ public class RiftLoginScreen extends Screen {
     public static ResourceLocation getDefaultAvatar(int size) {
         RiftLoginScreen tempScreen = new RiftLoginScreen(null);
         return tempScreen.getOrCreateAvatarTexture(null, size, false);
+    }
+
+    private String clipText(Font font, String text, int maxWidth) {
+        if (text == null) return "";
+        if (maxWidth <= 0) return "";
+        int w = font.width(text);
+        if (w <= maxWidth) return text;
+        String ell = "…";
+        int ellW = font.width(ell);
+        if (ellW > maxWidth) return "";
+        int len = text.length();
+        int lo = 0, hi = len;
+        while (lo < hi) {
+            int mid = (lo + hi + 1) / 2;
+            String sub = text.substring(0, mid);
+            if (font.width(sub) + ellW <= maxWidth) lo = mid; else hi = mid - 1;
+        }
+        if (lo <= 0) return ell;
+        return text.substring(0, lo) + ell;
     }
 
 }
