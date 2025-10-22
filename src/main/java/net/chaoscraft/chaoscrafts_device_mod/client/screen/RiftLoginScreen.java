@@ -617,7 +617,7 @@ public class RiftLoginScreen extends Screen {
         }
     }
 
-    private ResourceLocation getOrCreateAvatarTexture(ResourceLocation skin, int size, boolean drawOverlay) {
+    public ResourceLocation getOrCreateAvatarTexture(ResourceLocation skin, int size, boolean drawOverlay) {
         String key = (skin == null ? "default" : skin.toString()) + "#" + size + "#" + avatarResolution + "#" + (drawOverlay ? 1 : 0);
         if (avatarTextureCache.containsKey(key)) return avatarTextureCache.get(key);
 

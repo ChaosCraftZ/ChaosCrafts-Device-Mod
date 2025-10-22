@@ -1,5 +1,6 @@
 package net.chaoscraft.chaoscrafts_device_mod.client.app.messenger;
 
+import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.chaoscraft.chaoscrafts_device_mod.client.AccountManager;
 import net.chaoscraft.chaoscrafts_device_mod.client.app.IApp;
@@ -8,11 +9,16 @@ import net.chaoscraft.chaoscrafts_device_mod.client.screen.DraggableWindow;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.player.AbstractClientPlayer;
+import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.player.Player;
 
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -74,6 +80,36 @@ public class MessengerApp implements IApp {
 
     private final Map<UUID, String> groupDescriptionCache = new ConcurrentHashMap<>();
 
+    private static final Map<String, ResourceLocation> webAvatarTextureCache = new ConcurrentHashMap<>();
+
+    public static void clearWebAvatarCacheFor(UUID playerId) {
+        if (playerId == null) return;
+        String prefix = playerId.toString() + "_";
+        try {
+            List<String> keys = new ArrayList<>(webAvatarTextureCache.keySet());
+            for (String k : keys) {
+                if (k.startsWith(prefix)) {
+                    ResourceLocation rl = webAvatarTextureCache.remove(k);
+                    if (rl != null) {
+                        try { Minecraft.getInstance().getTextureManager().release(rl); } catch (Exception ignored) {}
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
+    public static void clearAllWebAvatarCache() {
+        try {
+            List<String> keys = new ArrayList<>(webAvatarTextureCache.keySet());
+            for (String k : keys) {
+                ResourceLocation rl = webAvatarTextureCache.remove(k);
+                if (rl != null) {
+                    try { Minecraft.getInstance().getTextureManager().release(rl); } catch (Exception ignored) {}
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
     enum Screen {
         CHAT_LIST, CONVERSATION, CONTACTS, FRIEND_REQUESTS, PROFILE, GROUP_CREATION, ADD_TO_GROUP, GROUP_SETTINGS
     }
@@ -88,6 +124,250 @@ public class MessengerApp implements IApp {
             this.title = title == null ? "" : title;
             this.isGroup = isGroup;
         }
+    }
+
+    private ResourceLocation getOrCreateAvatarTexture(UUID playerId, int size) {
+        try {
+            ResourceLocation webAvatar = fetchWebAvatar(playerId, size);
+            if (webAvatar != null) {
+                return webAvatar;
+            }
+
+            ResourceLocation skin = getPlayerSkinTexture(playerId);
+            if (skin != null) {
+                return AvatarHelper.getAvatarTexture(playerId, size);
+            }
+
+            return getDefaultAvatarTexture(size);
+
+        } catch (Exception e) {
+            if (Minecraft.getInstance().options.renderDebug) {
+                System.out.println("MessengerApp: Failed to get avatar texture for " + playerId + ": " + e);
+            }
+            return getDefaultAvatarTexture(size);
+        }
+    }
+
+
+
+    private ResourceLocation fetchWebAvatar(UUID playerId, int size) {
+        if (playerId == null) return null;
+        String key = playerId.toString() + "_" + size;
+
+        try {
+            ResourceLocation cached = webAvatarTextureCache.get(key);
+            if (cached != null) return cached;
+        } catch (Exception ignored) {}
+
+        NativeImage webImage = fetchSkinFromWeb(playerId, size);
+
+        if (webImage != null) {
+            try {
+                NativeImage circularImage = createCircularAvatar(webImage, size);
+                try { webImage.close(); } catch (Exception ignored) {}
+
+                DynamicTexture dynamicTexture = new DynamicTexture(circularImage);
+                ResourceLocation textureLocation = ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "web_avatar/" + playerId.toString() + "_" + size);
+                Minecraft.getInstance().getTextureManager().register(textureLocation, dynamicTexture);
+
+                webAvatarTextureCache.put(key, textureLocation);
+
+                if (Minecraft.getInstance().options.renderDebug) {
+                    System.out.println("MessengerApp: Successfully loaded and circularized web avatar for " + playerId);
+                }
+                return textureLocation;
+            } catch (Exception e) {
+                try { webImage.close(); } catch (Exception ignored) {}
+                if (Minecraft.getInstance().options.renderDebug) {
+                    System.out.println("MessengerApp: Failed to create circular texture from web image for " + playerId + ": " + e);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private NativeImage createCircularAvatar(NativeImage srcImage, int size) {
+        NativeImage dest = new NativeImage(size, size, true);
+
+        for (int y = 0; y < size; y++) {
+            for (int x = 0; x < size; x++) {
+                dest.setPixelRGBA(x, y, 0);
+            }
+        }
+
+        int radius = size / 2;
+        float center = radius - 0.5f;
+
+        for (int py = 0; py < size; py++) {
+            for (int px = 0; px < size; px++) {
+                float dx = px - center;
+                float dy = py - center;
+                float distance = (float) Math.sqrt(dx * dx + dy * dy);
+
+                if (distance <= radius) {
+                    int srcX = (int) ((px / (float) size) * srcImage.getWidth());
+                    int srcY = (int) ((py / (float) size) * srcImage.getHeight());
+
+                    srcX = Math.max(0, Math.min(srcImage.getWidth() - 1, srcX));
+                    srcY = Math.max(0, Math.min(srcImage.getHeight() - 1, srcY));
+
+                    int pixelColor = srcImage.getPixelRGBA(srcX, srcY);
+                    dest.setPixelRGBA(px, py, pixelColor);
+                }
+            }
+        }
+
+        return dest;
+    }
+
+
+    private NativeImage fetchSkinFromWeb(UUID playerId, int size) {
+        NativeImage image = fetchSkinFromCrafatar(playerId);
+        if (image != null) {
+            if (Minecraft.getInstance().options.renderDebug) {
+                System.out.println("MessengerApp: Got avatar from Crafatar for " + playerId);
+            }
+            return image;
+        }
+
+        String username = getUsernameFromUUID(playerId);
+        if (username != null) {
+            image = fetchSkinFromMinotar(username, size);
+            if (image != null) {
+                if (Minecraft.getInstance().options.renderDebug) {
+                    System.out.println("MessengerApp: Got avatar from Minotar for " + username);
+                }
+                return image;
+            }
+        }
+
+        if (Minecraft.getInstance().options.renderDebug) {
+            System.out.println("MessengerApp: No web avatar found for " + playerId);
+        }
+        return null;
+    }
+
+    private NativeImage fetchSkinFromCrafatar(UUID playerUUID) {
+        if (playerUUID == null) return null;
+
+        String urlStr = "https://crafatar.com/avatars/" + playerUUID.toString().replace("-", "") + "?size=" + 64 + "&overlay";
+
+        if (Minecraft.getInstance().options.renderDebug) {
+            System.out.println("MessengerApp: Trying Crafatar URL: " + urlStr);
+        }
+
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(urlStr);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(5000);
+            conn.setInstanceFollowRedirects(true);
+            int code = conn.getResponseCode();
+            if (code >= 200 && code < 400) {
+                try (java.io.InputStream in = conn.getInputStream()) {
+                    NativeImage ni = NativeImage.read(in);
+                    if (Minecraft.getInstance().options.renderDebug) System.out.println("MessengerApp: fetched avatar from Crafatar for " + playerUUID);
+                    return ni;
+                }
+            } else {
+                if (Minecraft.getInstance().options.renderDebug) System.out.println("MessengerApp: Crafatar returned code " + code + " for " + playerUUID);
+            }
+        } catch (Throwable e) {
+            if (Minecraft.getInstance().options.renderDebug) System.out.println("MessengerApp: crafatar fetch failed for " + playerUUID + " -> " + e);
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+        return null;
+    }
+
+    private NativeImage fetchSkinFromMinotar(String username, int size) {
+        if (username == null || username.isEmpty()) return null;
+
+        String urlStr = "https://minotar.net/helm/" + username + "/" + Math.max(64, Math.min(512, size));
+
+        if (Minecraft.getInstance().options.renderDebug) {
+            System.out.println("MessengerApp: Trying Minotar URL: " + urlStr);
+        }
+
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(urlStr);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(3000);
+            conn.setReadTimeout(5000);
+            conn.setInstanceFollowRedirects(true);
+            int code = conn.getResponseCode();
+            if (code >= 200 && code < 400) {
+                try (java.io.InputStream in = conn.getInputStream()) {
+                    NativeImage ni = NativeImage.read(in);
+                    if (Minecraft.getInstance().options.renderDebug) System.out.println("MessengerApp: fetched avatar from Minotar for " + username);
+                    return ni;
+                }
+            } else {
+                if (Minecraft.getInstance().options.renderDebug) System.out.println("MessengerApp: Minotar returned code " + code + " for " + username);
+            }
+        } catch (Throwable e) {
+            if (Minecraft.getInstance().options.renderDebug) System.out.println("MessengerApp: minotar fetch failed for " + username + " -> " + e);
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+        return null;
+    }
+
+    private ResourceLocation getPlayerSkinTexture(UUID playerId) {
+        try {
+            Minecraft mc = Minecraft.getInstance();
+
+            if (mc.player != null && mc.player.getUUID().equals(playerId)) {
+                return mc.player.getSkinTextureLocation();
+            }
+
+            if (mc.level != null) {
+                Player player = mc.level.getPlayerByUUID(playerId);
+                if (player instanceof AbstractClientPlayer) {
+                    return ((AbstractClientPlayer) player).getSkinTextureLocation();
+                }
+            }
+
+            return null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private ResourceLocation createAvatarTexture(ResourceLocation skin, UUID playerId, int size) {
+        return AvatarHelper.getAvatarTexture(playerId, size);
+    }
+
+    private String getUsernameFromUUID(UUID playerId) {
+        MessengerNetworkManager.Contact contact = networkManager.getContact(playerId);
+        if (contact != null && contact.displayName != null) {
+            return contact.displayName;
+        }
+
+        if (Minecraft.getInstance().player != null && Minecraft.getInstance().player.getUUID().equals(playerId)) {
+            return Minecraft.getInstance().player.getGameProfile().getName();
+        }
+
+        return null;
+    }
+
+    private ResourceLocation getDefaultAvatarTexture(int size) {
+        return AvatarHelper.getDefaultAvatar(size);
+    }
+
+    private ResourceLocation getCurrentPlayerAvatar(int size) {
+        try {
+            if (Minecraft.getInstance().player != null) {
+                UUID playerId = Minecraft.getInstance().player.getUUID();
+                return getOrCreateAvatarTexture(playerId, size);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return getDefaultAvatarTexture(size);
     }
 
     private int[] getContentRect(DraggableWindow window) {
@@ -397,12 +677,7 @@ public class MessengerApp implements IApp {
 
             } else if (contact != null) {
                 int avatarSize = 80;
-                ResourceLocation avatar;
-                try {
-                    avatar = AvatarHelper.getAvatarTexture(contact.playerId, avatarSize);
-                } catch (Exception e) {
-                    avatar = AvatarHelper.getDefaultAvatar(avatarSize);
-                }
+                ResourceLocation avatar = getOrCreateAvatarTexture(contact.playerId, avatarSize);
                 guiGraphics.blit(avatar, panelX + (panelWidth - avatarSize) / 2, panelY + 80, avatarSize, avatarSize, 0, 0, avatarSize, avatarSize, avatarSize, avatarSize);
 
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(contact.displayName),
@@ -452,11 +727,7 @@ public class MessengerApp implements IApp {
         int avatarSize = 36;
         ResourceLocation avatar;
         if (contact != null) {
-            try {
-                avatar = AvatarHelper.getAvatarTexture(contact.playerId, avatarSize);
-            } catch (Exception e) {
-                avatar = AvatarHelper.getDefaultAvatar(avatarSize);
-            }
+            avatar = getOrCreateAvatarTexture(contact.playerId, avatarSize);
             guiGraphics.blit(avatar, cx + 50, cy + 12, avatarSize, avatarSize, 0, 0, avatarSize, avatarSize, avatarSize, avatarSize);
 
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(contact.displayName), cx + 50 + avatarSize + 8, cy + 20, 0xFFFFFFFF, false);
@@ -600,11 +871,7 @@ public class MessengerApp implements IApp {
             ResourceLocation avatar;
             if (!isGroup) {
                 MessengerNetworkManager.Contact contact = networkManager.getContact(id);
-                try {
-                    avatar = AvatarHelper.getAvatarTexture(contact.playerId, avatarSize);
-                } catch (Exception e) {
-                    avatar = AvatarHelper.getDefaultAvatar(avatarSize);
-                }
+                avatar = getOrCreateAvatarTexture(contact.playerId, avatarSize);
                 guiGraphics.blit(avatar, cx + 12, chatY + 10, avatarSize, avatarSize, 0, 0, avatarSize, avatarSize, avatarSize, avatarSize);
             } else {
                 guiGraphics.fill(cx + 12, chatY + 10, cx + 12 + avatarSize, chatY + 10 + avatarSize, 0xFF8E44AD);
@@ -716,12 +983,40 @@ public class MessengerApp implements IApp {
                 continue;
             }
 
+            renderContactItem(guiGraphics, contact, cx + 16, contactY, cw - 32, 50, mouseX, mouseY);
             contactY += 55;
         }
 
         if (contactsScrollOffset > 0) {
             guiGraphics.fill(cx + cw - 10, cy + 160, cx + cw - 5, cy + ch, 0x66FFFFFF);
         }
+    }
+
+    private void renderContactItem(GuiGraphics guiGraphics, MessengerNetworkManager.Contact contact, int x, int y, int width, int height, int mouseX, int mouseY) {
+        boolean hovered = isMouseOver(mouseX, mouseY, x, y, width, height);
+        if (hovered) {
+            guiGraphics.fill(x, y, x + width, y + height, DraggableWindow.darkTheme ? 0x22333333 : 0x22DDDDDD);
+        }
+
+        int avatarSize = 40;
+        ResourceLocation avatar = getOrCreateAvatarTexture(contact.playerId, avatarSize);
+        guiGraphics.blit(avatar, x + 8, y + 5, avatarSize, avatarSize, 0, 0, avatarSize, avatarSize, avatarSize, avatarSize);
+
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(contact.displayName), x + 8 + avatarSize + 8, y + 10,
+                DraggableWindow.darkTheme ? 0xFFFFFFFF : 0xFF000000, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(contact.email), x + 8 + avatarSize + 8, y + 25,
+                DraggableWindow.darkTheme ? 0xFF8696A0 : 0xFF667781, false);
+
+        if (contact.isOnline) {
+            guiGraphics.fill(x + width - 20, y + 15, x + width - 12, y + 23, 0xFF00A884);
+        } else {
+            String lastSeen = "last seen " + formatTime(contact.lastSeen);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(lastSeen),
+                    x + width - Minecraft.getInstance().font.width(lastSeen) - 8, y + 15,
+                    DraggableWindow.darkTheme ? 0xFF8696A0 : 0xFF667781, false);
+        }
+
+        renderButton(guiGraphics, "Message", x + width - 100, y + 30, 80, 20, mouseX, mouseY);
     }
 
     private void renderFriendRequestsView(GuiGraphics guiGraphics, int cx, int cy, int cw, int ch, int mouseX, int mouseY) {
@@ -769,13 +1064,7 @@ public class MessengerApp implements IApp {
             MessengerNetworkManager.Contact contact = networkManager.getContact(profileViewingId);
             if (contact != null) {
                 int avatarSize = 120;
-                ResourceLocation avatar;
-                try {
-                    avatar = AvatarHelper.getAvatarTexture(contact.playerId, avatarSize);
-                } catch (Exception e) {
-                    avatar = AvatarHelper.getDefaultAvatar(avatarSize);
-                }
-
+                ResourceLocation avatar = getOrCreateAvatarTexture(contact.playerId, avatarSize);
                 guiGraphics.blit(avatar, cx + cw / 2 - avatarSize / 2, scrollY + 20, avatarSize, avatarSize, 0, 0, avatarSize, avatarSize, avatarSize, avatarSize);
 
                 guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(contact.displayName),
@@ -870,18 +1159,6 @@ public class MessengerApp implements IApp {
         return cursorPosition - currentPos;
     }
 
-    private ResourceLocation getCurrentPlayerAvatar(int size) {
-        try {
-            if (Minecraft.getInstance().player != null) {
-                UUID playerId = Minecraft.getInstance().player.getUUID();
-                return AvatarHelper.getAvatarTexture(playerId, size);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return AvatarHelper.getDefaultAvatar(size);
-    }
-
     private void renderEditableProfileField(GuiGraphics guiGraphics, String label, String value, int x, int y, int width, int mouseX, int mouseY) {
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(label), x, y - 15,
                 DraggableWindow.darkTheme ? 0xFF8696A0 : 0xFF667781, false);
@@ -899,38 +1176,6 @@ public class MessengerApp implements IApp {
         if (isMouseOver(mouseX, mouseY, x, y, width, 40)) {
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("✎"), x + width - 20, y + 12, 0xFF8696A0, false);
         }
-    }
-
-    private void renderContactItem(GuiGraphics guiGraphics, MessengerNetworkManager.Contact contact, int x, int y, int width, int height, int mouseX, int mouseY) {
-        boolean hovered = isMouseOver(mouseX, mouseY, x, y, width, height);
-        if (hovered) {
-            guiGraphics.fill(x, y, x + width, y + height, DraggableWindow.darkTheme ? 0x22333333 : 0x22DDDDDD);
-        }
-
-        int avatarSize = 40;
-        ResourceLocation avatar;
-        try {
-            avatar = AvatarHelper.getAvatarTexture(contact.playerId, avatarSize);
-        } catch (Exception e) {
-            avatar = AvatarHelper.getDefaultAvatar(avatarSize);
-        }
-        guiGraphics.blit(avatar, x + 8, y + 5, avatarSize, avatarSize, 0, 0, avatarSize, avatarSize, avatarSize, avatarSize);
-
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(contact.displayName), x + 8 + avatarSize + 8, y + 10,
-                DraggableWindow.darkTheme ? 0xFFFFFFFF : 0xFF000000, false);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(contact.email), x + 8 + avatarSize + 8, y + 25,
-                DraggableWindow.darkTheme ? 0xFF8696A0 : 0xFF667781, false);
-
-        if (contact.isOnline) {
-            guiGraphics.fill(x + width - 20, y + 15, x + width - 12, y + 23, 0xFF00A884);
-        } else {
-            String lastSeen = "last seen " + formatTime(contact.lastSeen);
-            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(lastSeen),
-                    x + width - Minecraft.getInstance().font.width(lastSeen) - 8, y + 15,
-                    DraggableWindow.darkTheme ? 0xFF8696A0 : 0xFF667781, false);
-        }
-
-        renderButton(guiGraphics, "Message", x + width - 100, y + 30, 80, 20, mouseX, mouseY);
     }
 
     private void renderMessages(GuiGraphics guiGraphics, int cx, int startY, int endY, int width) {
@@ -1050,9 +1295,19 @@ public class MessengerApp implements IApp {
             }
             avatarY = y - messageHeight + (isFirstInGroup ? 6 : 2);
             try {
-                ResourceLocation atex = AvatarHelper.getAvatarTexture(message.senderId, avatarSize);
+                ResourceLocation atex;
+                if (message.isFromMe()) {
+                    atex = getCurrentPlayerAvatar(avatarSize);
+                } else {
+                    atex = getOrCreateAvatarTexture(message.senderId, avatarSize);
+                }
+                if (atex == null) {
+                    atex = getDefaultAvatarTexture(avatarSize);
+                }
                 guiGraphics.blit(atex, avatarX, avatarY, avatarSize, avatarSize, 0, 0, avatarSize, avatarSize, avatarSize, avatarSize);
             } catch (Exception ignored) {
+                ResourceLocation defaultAvatar = getDefaultAvatarTexture(avatarSize);
+                guiGraphics.blit(defaultAvatar, avatarX, avatarY, avatarSize, avatarSize, 0, 0, avatarSize, avatarSize, avatarSize, avatarSize);
             }
         }
 
@@ -1653,6 +1908,10 @@ public class MessengerApp implements IApp {
                 continue;
             }
 
+            if (isMouseOver(mouseX, mouseY, cx + 16, contactY, cw - 32, 50)) {
+                openConversationById(contact.playerId);
+                return true;
+            }
             contactY += 55;
         }
 
@@ -1778,14 +2037,7 @@ public class MessengerApp implements IApp {
             String display = value.isEmpty() ? "" : Minecraft.getInstance().font.plainSubstrByWidth(value, cw - 48);
             if (focused) {
                 boolean caretOn = (System.currentTimeMillis() / 500) % 2 == 0;
-                if (caretOn) {
-                    String withCaret = display + "|";
-                    if (Minecraft.getInstance().font.width(withCaret) > cw - 48) {
-                        display = Minecraft.getInstance().font.plainSubstrByWidth(display, cw - 52) + "|";
-                    } else {
-                        display = withCaret;
-                    }
-                }
+                if (caretOn) display = display + "|";
             }
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(display), cx + 24, cy + ch - 146, 0xFFFFFFFF, false);
         }
@@ -2093,17 +2345,8 @@ public class MessengerApp implements IApp {
             guiGraphics.fill(cx + 20, infoY, cx + cw - 20, infoY + 25, 0x22333333);
 
             int avatarSmallSize = 20;
-            ResourceLocation avatar = null;
-            if (member != null) {
-                try {
-                    avatar = AvatarHelper.getAvatarTexture(memberId, avatarSmallSize);
-                } catch (Exception e) {
-                    avatar = AvatarHelper.getDefaultAvatar(avatarSmallSize);
-                }
-            }
-            if (avatar != null) {
-                guiGraphics.blit(avatar, cx + 25, infoY + 2, avatarSmallSize, avatarSmallSize, 0, 0, avatarSmallSize, avatarSmallSize, avatarSmallSize, avatarSmallSize);
-            }
+            ResourceLocation avatar = getOrCreateAvatarTexture(memberId, avatarSmallSize);
+            guiGraphics.blit(avatar, cx + 25, infoY + 2, avatarSmallSize, avatarSmallSize, 0, 0, avatarSmallSize, avatarSmallSize);
 
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(memberName), cx + 50, infoY + 5, 0xFFFFFFFF, false);
 
