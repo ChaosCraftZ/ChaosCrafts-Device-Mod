@@ -1,7 +1,6 @@
 package net.chaoscraft.chaoscrafts_device_mod.client.screen;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import com.mojang.authlib.GameProfile;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -9,7 +8,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.chat.Component;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.client.player.AbstractClientPlayer;
@@ -19,10 +17,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.io.IOException;
-import java.util.concurrent.atomic.AtomicReference;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.concurrent.TimeUnit;
 import net.chaoscraft.chaoscrafts_device_mod.ConfigHandler;
 
 /**
@@ -245,17 +239,17 @@ public class RiftLoginScreen extends Screen {
         if (!showSignIn) {
             long now = System.currentTimeMillis();
             if (now - lastBgClickTime <= DOUBLE_CLICK_MS) {
-                showSignIn = true;
-                showTile = true;
-                lastBgClickTime = 0L;
-            } else {
-                lastBgClickTime = now;
-            }
-            return true;
-        }
+                 showSignIn = true;
+                 showTile = true;
+                 lastBgClickTime = 0L;
+             } else {
+                 lastBgClickTime = now;
+             }
+             return true;
+         }
 
-        return super.mouseClicked(mouseX, mouseY, button);
-    }
+         return super.mouseClicked(mouseX, mouseY, button);
+     }
 
     private void onLogin() {
         if (!closingTransition) {
@@ -622,28 +616,9 @@ public class RiftLoginScreen extends Screen {
         if (avatarTextureCache.containsKey(key)) return avatarTextureCache.get(key);
 
         NativeImage srcImage = null;
-        boolean srcImageOwned = false;
         NativeImage dest = null;
         try {
             if (skin != null) {
-                try {
-                    AbstractTexture at = Minecraft.getInstance().getTextureManager().getTexture(skin);
-                    if (at instanceof DynamicTexture) {
-                        NativeImage texPixels = ((DynamicTexture) at).getPixels();
-                        if (texPixels != null) {
-                            srcImage = new NativeImage(texPixels.getWidth(), texPixels.getHeight(), true);
-                            for (int yy = 0; yy < texPixels.getHeight(); yy++) {
-                                for (int xx = 0; xx < texPixels.getWidth(); xx++) {
-                                    srcImage.setPixelRGBA(xx, yy, texPixels.getPixelRGBA(xx, yy));
-                                }
-                            }
-                            srcImageOwned = true;
-                        }
-                    }
-                } catch (Exception ignored) { srcImage = null; srcImageOwned = false; }
-            }
-
-            if (srcImage == null && skin != null) {
                 try {
                     java.util.Optional<Resource> opt = Minecraft.getInstance().getResourceManager().getResource(skin);
                     if (opt.isPresent()) {
@@ -652,13 +627,12 @@ public class RiftLoginScreen extends Screen {
                         try {
                             in = res.open();
                             srcImage = NativeImage.read(in);
-                            srcImageOwned = true;
                         } finally {
                             if (in != null) try { in.close(); } catch (Exception ignored) {}
                         }
                     }
                 } catch (IOException ignored) {
-                    srcImage = null; srcImageOwned = false;
+                    srcImage = null;
                 }
             }
 
@@ -726,121 +700,8 @@ public class RiftLoginScreen extends Screen {
             if (dest != null) try { dest.close(); } catch (Exception e) {}
             return null;
         } finally {
-            if (srcImage != null && srcImageOwned) try { srcImage.close(); } catch (Exception ignored) {}
+            if (srcImage != null) try { srcImage.close(); } catch (Exception ignored) {}
         }
-    }
-
-    private boolean tryTriggerSkinManagerForCurrentPlayer() {
-        try {
-            if (Minecraft.getInstance().player == null) return false;
-            GameProfile profile = Minecraft.getInstance().player.getGameProfile();
-            if (profile == null) return false;
-
-            Object mc = Minecraft.getInstance();
-            Object skinManager = null;
-            try {
-                try {
-                    java.lang.reflect.Method m = mc.getClass().getMethod("getSkinManager");
-                    skinManager = m.invoke(mc);
-                } catch (NoSuchMethodException ignored) {}
-                if (skinManager == null) {
-                    try {
-                        java.lang.reflect.Field f = mc.getClass().getDeclaredField("skinManager");
-                        f.setAccessible(true);
-                        skinManager = f.get(mc);
-                    } catch (NoSuchFieldException ignored) {}
-                }
-            } catch (Throwable ignored) {
-                skinManager = null;
-            }
-
-            if (skinManager == null) {
-                for (java.lang.reflect.Method m : mc.getClass().getMethods()) {
-                    Class<?>[] params = m.getParameterTypes();
-                    if (params.length >= 1 && params[0].equals(GameProfile.class)) {
-                        try {
-                            m.invoke(mc, profile);
-                            return true;
-                        } catch (Throwable ignored) {}
-                    }
-                }
-                return false;
-            }
-
-            for (java.lang.reflect.Method m : skinManager.getClass().getMethods()) {
-                String name = m.getName().toLowerCase(java.util.Locale.ROOT);
-                Class<?>[] params = m.getParameterTypes();
-                if (params.length >= 1 && params[0].equals(GameProfile.class) && (name.contains("load") || name.contains("request") || name.contains("texture") || name.contains("profile"))) {
-                    try {
-                        Object[] args = new Object[params.length];
-                        args[0] = profile;
-                        for (int i = 1; i < params.length; i++) {
-                            if (params[i].isPrimitive()) {
-                                if (params[i].equals(boolean.class)) args[i] = false;
-                                else args[i] = 0;
-                            } else args[i] = null;
-                        }
-                        m.setAccessible(true);
-                        m.invoke(skinManager, args);
-                        return true;
-                    } catch (Throwable ignored) {
-                    }
-                }
-            }
-        } catch (Throwable ignored) {}
-        return false;
-    }
-
-    private NativeImage fetchSkinFromCrafatar(UUID playerUUID) {
-        if (playerUUID == null) return null;
-        String urlStr = "https://crafatar.com/skins/" + playerUUID.toString().replace("-", "");
-        HttpURLConnection conn = null;
-        try {
-            URL url = new URL(urlStr);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(3000);
-            conn.setReadTimeout(5000);
-            conn.setInstanceFollowRedirects(true);
-            int code = conn.getResponseCode();
-            if (code >= 200 && code < 400) {
-                try (java.io.InputStream in = conn.getInputStream()) {
-                    NativeImage ni = NativeImage.read(in);
-                    if (Minecraft.getInstance().options.renderDebug) System.out.println("RiftLogin: fetched skin from Crafatar for " + playerUUID);
-                    return ni;
-                }
-            }
-        } catch (Throwable ignored) {
-            if (Minecraft.getInstance().options.renderDebug) System.out.println("RiftLogin: crafatar fetch failed for " + playerUUID + " -> " + ignored);
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
-        return null;
-    }
-
-    private NativeImage fetchSkinFromMinotar(String username, int size) {
-        if (username == null || username.isEmpty()) return null;
-        String urlStr = "https://minotar.net/helm/" + username + "/" + Math.max(64, Math.min(1024, size));
-        HttpURLConnection conn = null;
-        try {
-            URL url = new URL(urlStr);
-            conn = (HttpURLConnection) url.openConnection();
-            conn.setConnectTimeout(3000);
-            conn.setReadTimeout(5000);
-            conn.setInstanceFollowRedirects(true);
-            int code = conn.getResponseCode();
-            if (code >= 200 && code < 400) {
-                try (java.io.InputStream in = conn.getInputStream()) {
-                    NativeImage ni = NativeImage.read(in);
-                    if (Minecraft.getInstance().options.renderDebug) System.out.println("RiftLogin: fetched skin from Minotar for " + username);
-                    return ni;
-                }
-            }
-        } catch (Throwable ignored) {
-            if (Minecraft.getInstance().options.renderDebug) System.out.println("RiftLogin: minotar fetch failed for " + username + " -> " + ignored);
-        } finally {
-            if (conn != null) conn.disconnect();
-        }
-        return null;
     }
 
     private void ensureAvatarTextureAsync(final ResourceLocation skin, final int size) {
@@ -850,140 +711,19 @@ public class RiftLoginScreen extends Screen {
             bakingTextures.add(key);
         }
 
-        if (skin != null) {
-            try {
-                AbstractTexture at = Minecraft.getInstance().getTextureManager().getTexture(skin);
-                if (at instanceof DynamicTexture) {
-                    NativeImage texPixels = ((DynamicTexture) at).getPixels();
-                    if (texPixels != null) {
-                        final NativeImage srcCopy = new NativeImage(texPixels.getWidth(), texPixels.getHeight(), true);
-                        for (int yy = 0; yy < texPixels.getHeight(); yy++) {
-                            for (int xx = 0; xx < texPixels.getWidth(); xx++) {
-                                srcCopy.setPixelRGBA(xx, yy, texPixels.getPixelRGBA(xx, yy));
-                            }
-                        }
-
-                        java.util.concurrent.CompletableFuture.runAsync(() -> {
-                            try {
-                                NativeImage dest = new NativeImage(size, size, true);
-                                int radius = size / 2;
-                                float center = radius - 0.5f;
-                                for (int yy = 0; yy < size; yy++) for (int xx = 0; xx < size; xx++) dest.setPixelRGBA(xx, yy, 0);
-
-                                int srcW = srcCopy.getWidth();
-                                int srcH = srcCopy.getHeight();
-                                float sx = srcW / 64f; float sy = srcH / 64f;
-                                for (int py = 0; py < size; py++) {
-                                    for (int px = 0; px < size; px++) {
-                                        float dx = px - center; float dy = py - center;
-                                        if (dx * dx + dy * dy <= radius * radius) {
-                                            float u = 8f + (px / (float) size) * 8f;
-                                            float v = 8f + (py / (float) size) * 8f;
-                                            int ix = Math.min(srcW - 1, Math.max(0, (int) (u * sx)));
-                                            int iy = Math.min(srcH - 1, Math.max(0, (int) (v * sy)));
-                                            int base = srcCopy.getPixelRGBA(ix, iy);
-                                            int outCol = (0xFF << 24) | (base & 0x00FFFFFF);
-
-                                            float ou = 40f + (px / (float) size) * 8f;
-                                            float ov = 8f + (py / (float) size) * 8f;
-                                            int oix = Math.min(srcW - 1, Math.max(0, (int) (ou * sx)));
-                                            int oiy = Math.min(srcH - 1, Math.max(0, (int) (ov * sy)));
-                                            int overlay = srcCopy.getPixelRGBA(oix, oiy);
-                                            int oa = (overlay >> 24) & 0xFF;
-                                            if (oa > 0) {
-                                                int br = (base >> 16) & 0xFF; int bg = (base >> 8) & 0xFF; int bb = base & 0xFF;
-                                                int or = (overlay >> 16) & 0xFF; int og = (overlay >> 8) & 0xFF; int ob = overlay & 0xFF;
-                                                float af = oa / 255f;
-                                                int rr = (int) (or * af + br * (1f - af));
-                                                int gg = (int) (og * af + bg * (1f - af));
-                                                int bb2 = (int) (ob * af + bb * (1f - af));
-                                                outCol = (0xFF << 24) | (rr << 16) | (gg << 8) | (bb2);
-                                            }
-
-                                            dest.setPixelRGBA(px, py, outCol);
-                                        } else {
-                                            dest.setPixelRGBA(px, py, 0);
-                                        }
-                                    }
-                                }
-
-                                final NativeImage toRegister = dest;
-                                Minecraft.getInstance().execute(() -> {
-                                    try {
-                                        DynamicTexture dyn = new DynamicTexture(toRegister);
-                                        ResourceLocation rl = ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "avatar/" + Math.abs(key.hashCode()));
-                                        Minecraft.getInstance().getTextureManager().register(rl, dyn);
-                                        avatarTextureCache.put(key, rl);
-                                        if (Minecraft.getInstance().options.renderDebug) System.out.println("RiftLogin: registered avatar texture " + rl);
-                                    } catch (Exception ignored) {
-                                        if (toRegister != null) try { toRegister.close(); } catch (Exception e) {}
-                                    } finally {
-                                        synchronized (bakingTextures) { bakingTextures.remove(key); }
-                                    }
-                                });
-                            } finally {
-                                if (srcCopy != null) try { srcCopy.close(); } catch (Exception ignored) {}
-                            }
-                        });
-
-                        return;
-                    }
-                }
-            } catch (Exception ignored) {}
-        }
-
-        tryTriggerSkinManagerForCurrentPlayer();
-
         java.util.concurrent.CompletableFuture.runAsync(() -> {
             NativeImage srcImage = null;
             NativeImage dest = null;
             try {
-                final AtomicReference<NativeImage> found = new AtomicReference<>();
-                for (int attempt = 0; attempt < 6; attempt++) {
-                    if (skin != null) {
-                        Minecraft.getInstance().execute(() -> {
-                            try {
-                                AbstractTexture at = Minecraft.getInstance().getTextureManager().getTexture(skin);
-                                if (at instanceof DynamicTexture) {
-                                    NativeImage tex = ((DynamicTexture) at).getPixels();
-                                    if (tex != null) {
-                                        NativeImage copy = new NativeImage(tex.getWidth(), tex.getHeight(), true);
-                                        for (int yy = 0; yy < tex.getHeight(); yy++) for (int xx = 0; xx < tex.getWidth(); xx++) copy.setPixelRGBA(xx, yy, tex.getPixelRGBA(xx, yy));
-                                        found.set(copy);
-                                    }
-                                }
-                            } catch (Throwable ignored) {}
-                        });
-                    }
-
-                    try { TimeUnit.MILLISECONDS.sleep(400); } catch (InterruptedException ignored) {}
-
-                    if (found.get() != null) { srcImage = found.get(); break; }
-                }
-
-                if (srcImage == null) {
-                    UUID uid = null;
-                    String uname = null;
-                    try { if (Minecraft.getInstance().player != null) { uid = Minecraft.getInstance().player.getUUID(); uname = Minecraft.getInstance().player.getGameProfile().getName(); } } catch (Throwable ignored) {}
-                    if (uid != null) {
-                        try {
-                            NativeImage fetched = fetchSkinFromCrafatar(uid);
-                            if (fetched != null) {
-                                srcImage = fetched;
-                                if (Minecraft.getInstance().options.renderDebug) System.out.println("RiftLogin: using Crafatar skin for avatar");
+                if (skin != null) {
+                    try {
+                        java.util.Optional<Resource> opt = Minecraft.getInstance().getResourceManager().getResource(skin);
+                        if (opt.isPresent()) {
+                            try (java.io.InputStream in = opt.get().open()) {
+                                srcImage = NativeImage.read(in);
                             }
-                        } catch (Throwable ignored) {}
-                    }
-
-                    if (srcImage == null && uname != null) {
-                        try {
-                            NativeImage fetched2 = fetchSkinFromMinotar(uname, Math.max(size, 64));
-                            if (fetched2 != null) {
-                                srcImage = fetched2;
-                                if (Minecraft.getInstance().options.renderDebug) System.out.println("RiftLogin: using Minotar skin for avatar");
-                            }
-                        } catch (Throwable ignored) {}
-                    }
+                        }
+                    } catch (IOException ignored) { srcImage = null; }
                 }
 
                 dest = new NativeImage(size, size, true);
