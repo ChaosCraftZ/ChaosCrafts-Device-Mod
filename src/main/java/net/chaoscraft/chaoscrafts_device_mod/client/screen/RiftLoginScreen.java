@@ -434,7 +434,7 @@ public class RiftLoginScreen extends Screen {
                     sMouseY >= inputY && sMouseY < inputY + pinFieldHeight);
 
             int arrowBg = hoverArrow ? 0x66FFFFFF : 0x33FFFFFF;
-            gui.fill(arrowButtonX, inputX == inputX ? inputY : inputY, arrowButtonX + arrowButtonSize, inputY + pinFieldHeight, arrowBg);
+            gui.fill(arrowButtonX, inputY, arrowButtonX + arrowButtonSize, inputY + pinFieldHeight, arrowBg);
 
             gui.fill(arrowButtonX, inputY, arrowButtonX + arrowButtonSize, inputY + 1, fieldBorder);
             gui.fill(arrowButtonX, inputY + pinFieldHeight - 1, arrowButtonX + arrowButtonSize, inputY + pinFieldHeight, fieldBorder);
@@ -617,22 +617,31 @@ public class RiftLoginScreen extends Screen {
 
         NativeImage srcImage = null;
         NativeImage dest = null;
+        boolean srcOwned = false;
         try {
             if (skin != null) {
+                // First try to extract pixels from a texture that might already be registered with the TextureManager rather the displaying a white toothpaste screen ig
                 try {
-                    java.util.Optional<Resource> opt = Minecraft.getInstance().getResourceManager().getResource(skin);
-                    if (opt.isPresent()) {
-                        Resource res = opt.get();
-                        java.io.InputStream in = null;
-                        try {
-                            in = res.open();
-                            srcImage = NativeImage.read(in);
-                        } finally {
-                            if (in != null) try { in.close(); } catch (Exception ignored) {}
-                        }
-                    }
-                } catch (IOException ignored) {
+                    net.minecraft.client.renderer.texture.AbstractTexture abstractTex = Minecraft.getInstance().getTextureManager().getTexture(skin);
+                    srcImage = tryExtractNativeImageFromTexture(abstractTex);
+                } catch (Exception ignored) {
                     srcImage = null;
+                }
+
+                // If that failed, fall back to ResourceManager (embedded resource) + fix your goddman code and the hell is a util doin in a loading class and not in a Login Screen???
+                if (srcImage == null) {
+                    try {
+                        java.util.Optional<Resource> opt = Minecraft.getInstance().getResourceManager().getResource(skin);
+                        if (opt.isPresent()) {
+                            Resource res = opt.get();
+                            try (java.io.InputStream in = res.open()) {
+                                srcImage = NativeImage.read(in);
+                                srcOwned = true; // close it later ig
+                            }
+                        }
+                    } catch (IOException ignored) {
+                        srcImage = null;
+                    }
                 }
             }
 
@@ -700,8 +709,43 @@ public class RiftLoginScreen extends Screen {
             if (dest != null) try { dest.close(); } catch (Exception e) {}
             return null;
         } finally {
-            if (srcImage != null) try { srcImage.close(); } catch (Exception ignored) {}
+            if (srcOwned && srcImage != null) try { srcImage.close(); } catch (Exception ignored) {}
         }
+    }
+
+    private NativeImage tryExtractNativeImageFromTexture(net.minecraft.client.renderer.texture.AbstractTexture abstractTex) {
+        if (abstractTex == null) return null;
+        try {
+            // If it's a DynamicTexture, attempt to extract its NativeImage via public method or reflection rather then displayin Toothpaste flashbangs
+            if (abstractTex instanceof DynamicTexture) {
+                DynamicTexture dyn = (DynamicTexture) abstractTex;
+                try {
+                    java.lang.reflect.Method m = DynamicTexture.class.getDeclaredMethod("getPixels");
+                    m.setAccessible(true);
+                    Object o = m.invoke(dyn);
+                    if (o instanceof NativeImage) return (NativeImage) o;
+                } catch (NoSuchMethodException ignored) {}
+
+                String[] likelyFieldNames = new String[] { "image", "nativeImage", "pixels", "pixelData" };
+                for (String fn : likelyFieldNames) {
+                    try {
+                        java.lang.reflect.Field f = dyn.getClass().getDeclaredField(fn);
+                        f.setAccessible(true);
+                        Object o = f.get(dyn);
+                        if (o instanceof NativeImage) return (NativeImage) o;
+                    } catch (Exception ignored) {}
+                }
+
+                for (java.lang.reflect.Field f : dyn.getClass().getDeclaredFields()) {
+                    try {
+                        f.setAccessible(true);
+                        Object o = f.get(dyn);
+                        if (o instanceof NativeImage) return (NativeImage) o;
+                    } catch (Exception ignored) {}
+                }
+            }
+        } catch (Throwable ignored) {}
+        return null;
     }
 
     private void ensureAvatarTextureAsync(final ResourceLocation skin, final int size) {
@@ -714,16 +758,27 @@ public class RiftLoginScreen extends Screen {
         java.util.concurrent.CompletableFuture.runAsync(() -> {
             NativeImage srcImage = null;
             NativeImage dest = null;
+            boolean srcOwned = false;
             try {
                 if (skin != null) {
                     try {
-                        java.util.Optional<Resource> opt = Minecraft.getInstance().getResourceManager().getResource(skin);
-                        if (opt.isPresent()) {
-                            try (java.io.InputStream in = opt.get().open()) {
-                                srcImage = NativeImage.read(in);
+                        net.minecraft.client.renderer.texture.AbstractTexture at = Minecraft.getInstance().getTextureManager().getTexture(skin);
+                        srcImage = tryExtractNativeImageFromTexture(at);
+                    } catch (Exception ignored) {
+                        srcImage = null;
+                    }
+
+                    if (srcImage == null) {
+                        try {
+                            java.util.Optional<Resource> opt = Minecraft.getInstance().getResourceManager().getResource(skin);
+                            if (opt.isPresent()) {
+                                try (java.io.InputStream in = opt.get().open()) {
+                                    srcImage = NativeImage.read(in);
+                                    srcOwned = true;
+                                }
                             }
-                        }
-                    } catch (IOException ignored) { srcImage = null; }
+                        } catch (IOException ignored) { srcImage = null; }
+                    }
                 }
 
                 dest = new NativeImage(size, size, true);
@@ -794,7 +849,7 @@ public class RiftLoginScreen extends Screen {
                 synchronized (bakingTextures) { bakingTextures.remove(key); }
                 if (dest != null) try { dest.close(); } catch (Exception ignored) {}
             } finally {
-                if (srcImage != null) try { srcImage.close(); } catch (Exception ignored) {}
+                if (srcOwned && srcImage != null) try { srcImage.close(); } catch (Exception ignored) {}
             }
         });
     }
