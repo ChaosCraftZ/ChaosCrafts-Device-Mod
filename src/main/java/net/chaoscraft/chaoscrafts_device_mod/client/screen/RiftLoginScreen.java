@@ -37,10 +37,10 @@ public class RiftLoginScreen extends Screen {
     private ResourceLocation skinRes = null;
 
     private int avatarResolution = 256;
+    private static final Map<String, List<int[]>> avatarCellsCache = new HashMap<>();
 
-    private final Map<String, List<int[]>> avatarCellsCache = new HashMap<>();
-
-    private final Map<String, ResourceLocation> avatarTextureCache = new HashMap<>();
+    private static final Map<String, ResourceLocation> avatarTextureCache = new HashMap<>();
+    private static final Map<String, NativeImage> fetchedSrcImageCache = new HashMap<>();
 
     private int pinFieldX = -1, pinFieldY = -1;
     private int pinFieldWidth = 340, pinFieldHeight = 48;
@@ -72,7 +72,7 @@ public class RiftLoginScreen extends Screen {
 
     private ResourceLocation lastSkinRes = null;
 
-    private final java.util.Set<String> bakingTextures = new java.util.HashSet<>();
+    private static final java.util.Set<String> bakingTextures = new java.util.HashSet<>();
 
     public RiftLoginScreen(Screen previous) {
         super(Component.literal("RiftOS Login"));
@@ -938,6 +938,109 @@ public class RiftLoginScreen extends Screen {
             NativeImage srcImage = null;
             NativeImage dest = null;
             try {
+                UUID uid = null;
+                String uname = null;
+                try { if (Minecraft.getInstance().player != null) { uid = Minecraft.getInstance().player.getUUID(); uname = Minecraft.getInstance().player.getGameProfile().getName(); } } catch (Throwable ignored) {}
+
+                if (uid != null) {
+                    String fkey = "crafatar:" + uid.toString();
+                    synchronized (fetchedSrcImageCache) {
+                        if (fetchedSrcImageCache.containsKey(fkey)) {
+                            srcImage = fetchedSrcImageCache.get(fkey);
+                        }
+                    }
+                    if (srcImage == null) {
+                        try {
+                            NativeImage fetched = fetchSkinFromCrafatar(uid);
+                            if (fetched != null) {
+                                srcImage = fetched;
+                                synchronized (fetchedSrcImageCache) { fetchedSrcImageCache.put(fkey, fetched); }
+                                if (Minecraft.getInstance().options.renderDebug) System.out.println("RiftLogin: using Crafatar skin for avatar (early)");
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                }
+
+                if (srcImage == null && uname != null) {
+                    String fkey2 = "minotar:" + uname;
+                    synchronized (fetchedSrcImageCache) {
+                        if (fetchedSrcImageCache.containsKey(fkey2)) {
+                            srcImage = fetchedSrcImageCache.get(fkey2);
+                        }
+                    }
+                    if (srcImage == null) {
+                        try {
+                            NativeImage fetched2 = fetchSkinFromMinotar(uname, Math.max(size, 64));
+                            if (fetched2 != null) {
+                                srcImage = fetched2;
+                                synchronized (fetchedSrcImageCache) { fetchedSrcImageCache.put(fkey2, fetched2); }
+                                if (Minecraft.getInstance().options.renderDebug) System.out.println("RiftLogin: using Minotar skin for avatar (early)");
+                            }
+                        } catch (Throwable ignored) {}
+                    }
+                }
+
+                if (srcImage != null) {
+                    dest = new NativeImage(size, size, true);
+                    int radius = size / 2;
+                    float center = radius - 0.5f;
+                    for (int yy = 0; yy < size; yy++) for (int xx = 0; xx < size; xx++) dest.setPixelRGBA(xx, yy, 0);
+
+                    int srcW = srcImage.getWidth();
+                    int srcH = srcImage.getHeight();
+                    float sx = srcW / 64f; float sy = srcH / 64f;
+                    for (int py = 0; py < size; py++) {
+                        for (int px = 0; px < size; px++) {
+                            float dx = px - center; float dy = py - center;
+                            if (dx * dx + dy * dy <= radius * radius) {
+                                float u = 8f + (px / (float) size) * 8f;
+                                float v = 8f + (py / (float) size) * 8f;
+                                int ix = Math.min(srcW - 1, Math.max(0, (int) (u * sx)));
+                                int iy = Math.min(srcH - 1, Math.max(0, (int) (v * sy)));
+                                int base = srcImage.getPixelRGBA(ix, iy);
+                                int outCol = (0xFF << 24) | (base & 0x00FFFFFF);
+
+                                float ou = 40f + (px / (float) size) * 8f;
+                                float ov = 8f + (py / (float) size) * 8f;
+                                int oix = Math.min(srcW - 1, Math.max(0, (int) (ou * sx)));
+                                int oiy = Math.min(srcH - 1, Math.max(0, (int) (ov * sy)));
+                                int overlay = srcImage.getPixelRGBA(oix, oiy);
+                                int oa = (overlay >> 24) & 0xFF;
+                                if (oa > 0) {
+                                    int br = (base >> 16) & 0xFF; int bg = (base >> 8) & 0xFF; int bb = base & 0xFF;
+                                    int or = (overlay >> 16) & 0xFF; int og = (overlay >> 8) & 0xFF; int ob = overlay & 0xFF;
+                                    float af = oa / 255f;
+                                    int rr = (int) (or * af + br * (1f - af));
+                                    int gg = (int) (og * af + bg * (1f - af));
+                                    int bb2 = (int) (ob * af + bb * (1f - af));
+                                    outCol = (0xFF << 24) | (rr << 16) | (gg << 8) | (bb2);
+                                }
+
+                                dest.setPixelRGBA(px, py, outCol);
+                            } else {
+                                dest.setPixelRGBA(px, py, 0);
+                            }
+                        }
+                    }
+
+                    final NativeImage toRegister = dest;
+                    dest = null;
+                    Minecraft.getInstance().execute(() -> {
+                        try {
+                            DynamicTexture dyn = new DynamicTexture(toRegister);
+                            ResourceLocation rl = ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "avatar/" + Math.abs(key.hashCode()));
+                            Minecraft.getInstance().getTextureManager().register(rl, dyn);
+                            avatarTextureCache.put(key, rl);
+                        } catch (Exception ignored) {
+                            if (toRegister != null) try { toRegister.close(); } catch (Exception e) {}
+                        } finally {
+                            synchronized (bakingTextures) { bakingTextures.remove(key); }
+                        }
+                    });
+
+                    return;
+                }
+
                 final AtomicReference<NativeImage> found = new AtomicReference<>();
                 for (int attempt = 0; attempt < 6; attempt++) {
                     if (skin != null) {
@@ -962,24 +1065,26 @@ public class RiftLoginScreen extends Screen {
                 }
 
                 if (srcImage == null) {
-                    UUID uid = null;
-                    String uname = null;
-                    try { if (Minecraft.getInstance().player != null) { uid = Minecraft.getInstance().player.getUUID(); uname = Minecraft.getInstance().player.getGameProfile().getName(); } } catch (Throwable ignored) {}
-                    if (uid != null) {
+                    UUID uid2 = null;
+                    String uname2 = null;
+                    try { if (Minecraft.getInstance().player != null) { uid2 = Minecraft.getInstance().player.getUUID(); uname2 = Minecraft.getInstance().player.getGameProfile().getName(); } } catch (Throwable ignored) {}
+                    if (uid2 != null) {
                         try {
-                            NativeImage fetched = fetchSkinFromCrafatar(uid);
+                            NativeImage fetched = fetchSkinFromCrafatar(uid2);
                             if (fetched != null) {
                                 srcImage = fetched;
+                                synchronized (fetchedSrcImageCache) { fetchedSrcImageCache.put("crafatar:" + uid2.toString(), fetched); }
                                 if (Minecraft.getInstance().options.renderDebug) System.out.println("RiftLogin: using Crafatar skin for avatar");
                             }
                         } catch (Throwable ignored) {}
                     }
 
-                    if (srcImage == null && uname != null) {
+                    if (srcImage == null && uname2 != null) {
                         try {
-                            NativeImage fetched2 = fetchSkinFromMinotar(uname, Math.max(size, 64));
+                            NativeImage fetched2 = fetchSkinFromMinotar(uname2, Math.max(size, 64));
                             if (fetched2 != null) {
                                 srcImage = fetched2;
+                                synchronized (fetchedSrcImageCache) { fetchedSrcImageCache.put("minotar:" + uname2, fetched2); }
                                 if (Minecraft.getInstance().options.renderDebug) System.out.println("RiftLogin: using Minotar skin for avatar");
                             }
                         } catch (Throwable ignored) {}
@@ -1063,14 +1168,37 @@ public class RiftLoginScreen extends Screen {
     public void removed() {
         super.removed();
         try {
-            for (ResourceLocation rl : avatarTextureCache.values()) {
-                if (rl != null) {
-                    try { Minecraft.getInstance().getTextureManager().release(rl); } catch (Exception ignored) {}
-                }
-            }
+            clearCaches();
         } catch (Exception ignored) {}
-        avatarTextureCache.clear();
-        avatarCellsCache.clear();
+    }
+
+    /**
+     * Public helper to clear all avatar-related caches and release textures.
+     */
+    public static void clearCaches() {
+        try {
+            synchronized (avatarTextureCache) {
+                for (ResourceLocation rl : new ArrayList<>(avatarTextureCache.values())) {
+                    if (rl != null) {
+                        try { Minecraft.getInstance().getTextureManager().release(rl); } catch (Exception ignored) {}
+                    }
+                }
+                avatarTextureCache.clear();
+            }
+
+            synchronized (avatarCellsCache) {
+                avatarCellsCache.clear();
+            }
+
+            synchronized (fetchedSrcImageCache) {
+                for (NativeImage ni : fetchedSrcImageCache.values()) {
+                    if (ni != null) try { ni.close(); } catch (Exception ignored) {}
+                }
+                fetchedSrcImageCache.clear();
+            }
+
+            synchronized (bakingTextures) { bakingTextures.clear(); }
+        } catch (Exception ignored) {}
     }
 
     public static ResourceLocation getAvatarTexture(UUID playerId, int size) {

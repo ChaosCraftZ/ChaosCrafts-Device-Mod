@@ -2,7 +2,6 @@ package net.chaoscraft.chaoscrafts_device_mod.client.avatar;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.entity.player.Player;
 import net.chaoscraft.chaoscrafts_device_mod.client.screen.RiftLoginScreen;
 
 import java.util.UUID;
@@ -13,7 +12,7 @@ public class AvatarHelper {
         try {
             return RiftLoginScreen.getAvatarTexture(playerId, size);
         } catch (Exception e) {
-            e.printStackTrace();
+            if (Minecraft.getInstance().options.renderDebug) System.out.println("AvatarHelper: getAvatarTexture failed -> " + e);
             return getDefaultAvatar(size);
         }
     }
@@ -23,5 +22,8 @@ public class AvatarHelper {
     }
 
     public static void clearCache() {
+        try {
+            RiftLoginScreen.clearCaches();
+        } catch (Exception ignored) {}
     }
 }
