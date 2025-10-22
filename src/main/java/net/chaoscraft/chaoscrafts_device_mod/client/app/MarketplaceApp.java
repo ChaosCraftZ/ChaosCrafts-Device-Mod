@@ -50,16 +50,22 @@ public class MarketplaceApp implements IApp {
         for (AppRegistry.AppInfo appInfo : allApps) {
             if (registry.isDefaultApp(appInfo.internalName)) continue;
 
+            String internalLow = appInfo.internalName == null ? "" : appInfo.internalName.toLowerCase(Locale.ROOT).trim();
+
+            if (!ConfigHandler.experimentalAppsEnabled()) {
+                if (internalLow.equals("calendar") || internalLow.equals("calender")) continue;
+            }
+
             AppInfo marketplaceApp = new AppInfo(
                     appInfo.internalName,
                     appInfo.displayName,
                     appInfo.description,
                     appInfo.version,
-                    5, // 5 second download time
+                    5,
                     false
             );
 
-            switch (appInfo.internalName.toLowerCase()) {
+            switch (internalLow) {
                 case "geometry dash":
                     gamesCategory.addApp(marketplaceApp);
                     break;
@@ -70,6 +76,7 @@ public class MarketplaceApp implements IApp {
                 case "home security":
                 case "notes":
                 case "calendar":
+                case "calender":
                 case "weather":
                     utilitiesCategory.addApp(marketplaceApp);
                     break;

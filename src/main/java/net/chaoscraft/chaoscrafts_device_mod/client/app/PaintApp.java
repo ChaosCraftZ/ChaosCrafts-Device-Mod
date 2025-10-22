@@ -3,11 +3,12 @@ package net.chaoscraft.chaoscrafts_device_mod.client.app;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.network.chat.Component;
 import net.chaoscraft.chaoscrafts_device_mod.client.async.AsyncTaskManager;
 import net.chaoscraft.chaoscrafts_device_mod.client.fs.FilesManager;
 import net.chaoscraft.chaoscrafts_device_mod.client.screen.DraggableWindow;
+import net.minecraft.sounds.SoundEvents;
 
 import java.awt.*;
 import java.awt.image.BufferedImage;
@@ -22,9 +23,6 @@ public class PaintApp implements IApp {
     private int brushSize = 4;
     private int currentColor = 0xFF000000;
     private final AsyncTaskManager asyncManager = AsyncTaskManager.getInstance();
-
-    private EditBox hexColorInput;
-    private boolean hexInputFocused = false;
 
     private boolean colorPickerOpen = false;
     private float hue = 0f;
@@ -41,9 +39,6 @@ public class PaintApp implements IApp {
     @Override
     public void onOpen(DraggableWindow window) {
         this.window = window;
-        this.hexColorInput = new EditBox(Minecraft.getInstance().font, 0, 0, 80, 16, Component.literal("HEX"));
-        this.hexColorInput.setMaxLength(7);
-        this.hexColorInput.setValue("#000000");
     }
 
     @Override
@@ -83,12 +78,8 @@ public class PaintApp implements IApp {
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Colors"), colorPickerBtnX + 8, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
          int hexInputX = colorPickerBtnX + 86;
-         hexColorInput.setX(hexInputX);
-         hexColorInput.setY(cy + 6);
-         hexColorInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
-
-        guiGraphics.fill(hexInputX + 86, cy + 6, hexInputX + 106, cy + 26, currentColor);
-        guiGraphics.fill(hexInputX + 85, cy + 5, hexInputX + 107, cy + 27, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFBFBFBF);
+         guiGraphics.fill(hexInputX, cy + 6, hexInputX + 86, cy + 26, DraggableWindow.darkTheme ? 0xFF666666 : 0xFFBFBFBF);
+         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Coming soon"), hexInputX + 4, cy + 10, DraggableWindow.textPrimaryColor(), false);
 
          if (colorPickerOpen) {
              renderColorPicker(guiGraphics, cx, cy, cw, ch);
@@ -262,13 +253,6 @@ public class PaintApp implements IApp {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 32, cw = r[2] - 16;
 
-        if (hexColorInput.isMouseOver(mouseRelX, mouseRelY)) {
-            hexInputFocused = true;
-            hexColorInput.mouseClicked(mouseRelX, mouseRelY, button);
-            return true;
-        }
-        hexInputFocused = false;
-
         int colorPickerBtnX = cx + 180 + palette.length * 20 + 10;
         if (mouseRelX >= colorPickerBtnX && mouseRelX <= colorPickerBtnX + 80 &&
                 mouseRelY >= cy + 6 && mouseRelY <= cy + 26) {
@@ -348,7 +332,6 @@ public class PaintApp implements IApp {
             int px = paletteX + i * 20;
             if (mouseRelX >= px && mouseRelX <= px + 16 && mouseRelY >= cy + 6 && mouseRelY <= cy + 22) {
                 currentColor = palette[i];
-                hexColorInput.setValue(String.format("#%06X", currentColor & 0xFFFFFF));
                 return true;
             }
         }
@@ -366,7 +349,6 @@ public class PaintApp implements IApp {
 
     private void updateColorFromHSV() {
         currentColor = hsvToRgb(hue, saturation, value);
-        hexColorInput.setValue(String.format("#%06X", currentColor & 0xFFFFFF));
     }
 
     @Override
@@ -434,27 +416,11 @@ public class PaintApp implements IApp {
 
     @Override
     public boolean charTyped(DraggableWindow window, char codePoint, int modifiers) {
-        if (hexInputFocused) {
-            boolean result = hexColorInput.charTyped(codePoint, modifiers);
-            if (result) {
-                try {
-                    String hex = hexColorInput.getValue().replace("#", "");
-                    if (hex.length() == 6) {
-                        currentColor = 0xFF000000 | Integer.parseInt(hex, 16);
-                    }
-                } catch (NumberFormatException e) {
-                }
-            }
-            return result;
-        }
         return false;
     }
 
     @Override
     public boolean keyPressed(DraggableWindow window, int keyCode, int scanCode, int modifiers) {
-        if (hexInputFocused) {
-            return hexColorInput.keyPressed(keyCode, scanCode, modifiers);
-        }
         return false;
     }
 
@@ -490,8 +456,8 @@ public class PaintApp implements IApp {
 
                 asyncManager.executeOnMainThread(() -> {
                     Minecraft.getInstance().getSoundManager().play(
-                            net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(
-                                    net.minecraft.sounds.SoundEvents.UI_BUTTON_CLICK, 1f
+                            SimpleSoundInstance.forUI(
+                                    SoundEvents.UI_BUTTON_CLICK, 1f
                             )
                     );
                 });

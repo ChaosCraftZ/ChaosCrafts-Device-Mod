@@ -6,7 +6,6 @@ import com.google.gson.reflect.TypeToken;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.network.chat.Component;
 import net.chaoscraft.chaoscrafts_device_mod.client.async.AsyncTaskManager;
 import net.chaoscraft.chaoscrafts_device_mod.client.fs.FilesManager;
@@ -29,8 +28,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SettingsApp implements IApp {
     private DraggableWindow window;
-    private EditBox accentColorInput;
-    private boolean accentInputFocused = false;
     private final AsyncTaskManager asyncManager = AsyncTaskManager.getInstance();
 
     private static final Map<String, Object> SETTINGS = new HashMap<>();
@@ -143,15 +140,12 @@ public class SettingsApp implements IApp {
     @Override
     public void onOpen(DraggableWindow window) {
         this.window = window;
-        this.accentColorInput = new EditBox(Minecraft.getInstance().font, 0, 0, 80, 16, Component.literal("Accent"));
-        this.accentColorInput.setMaxLength(7);
         if (SETTINGS_LOADED.get()) initializeUI(); else {
             asyncManager.submitCPUTask(() -> { while (!SETTINGS_LOADED.get()) { try { Thread.sleep(10);} catch (InterruptedException ex){Thread.currentThread().interrupt();break;} } asyncManager.executeOnMainThread(this::initializeUI); });
         }
     }
 
     private void initializeUI() {
-        this.accentColorInput.setValue(String.format("#%06X", DraggableWindow.accentColorARGB & 0xFFFFFF));
         loadWallpapersAsync();
     }
 
@@ -188,6 +182,10 @@ public class SettingsApp implements IApp {
     public void renderContent(GuiGraphics guiGraphics, PoseStack poseStack, DraggableWindow window, int mouseRelX, int mouseRelY, float partialTick) {
         int[] r = window.getRenderRect(26);
         int cx = r[0] + 8, cy = r[1] + 32, cw = r[2] - 16;
+        int absMouseX = r[0] + mouseRelX;
+        int absMouseY = r[1] + mouseRelY;
+        int rawMouseX = mouseRelX;
+        int rawMouseY = mouseRelY;
 
         int sidebarW = 140;
         guiGraphics.fill(cx, cy, cx + sidebarW, cy + 220, DraggableWindow.darkTheme ? 0xFF1A1A1A : 0xFFCCCCCC);
@@ -213,7 +211,7 @@ public class SettingsApp implements IApp {
 
             int accentY = by + 34;
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Accent Color"), mainX + 8, accentY, DraggableWindow.textPrimaryColor(), false);
-             accentColorInput.setX(mainX + 8); accentColorInput.setY(accentY + 14); accentColorInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Coming soon"), mainX + 8, accentY + 18, DraggableWindow.textSecondaryColor(), false);
 
             int swX = mainX + 120, swY = accentY + 14; int swSize = 18; for (int i=0;i<accentPalette.length;i++){
                 int sx = swX + i*(swSize+6);
@@ -236,7 +234,6 @@ public class SettingsApp implements IApp {
             int ltX = mainX + 220, ltY = otherY + 20; guiGraphics.fill(ltX, ltY, ltX+40, ltY+16, largeText ? DraggableWindow.accentColorARGB : 0xFF777777);
             if (ConfigHandler.debugButtonsEnabled()) {
                 DebugOverlay.drawHitbox(guiGraphics, toggleX, toggleY, toggleX + toggleW, toggleY + toggleH, "toggle:darkMode");
-                DebugOverlay.drawHitbox(guiGraphics, accentColorInput.getX(), accentColorInput.getY(), accentColorInput.getX() + accentColorInput.getWidth(), accentColorInput.getY() + 16, "input:accentColor");
                 for (int i=0;i<accentPalette.length;i++){
                     int sx = swX + i*(swSize+6);
                     DebugOverlay.drawHitbox(guiGraphics, sx, swY, sx+swSize, swY+swSize, "swatch:"+i);
@@ -290,30 +287,36 @@ public class SettingsApp implements IApp {
                 int baseX = previewX + 4 + i * (thumbSize + thumbPad) - Math.round(thumbOffset);
                 if (baseX + thumbSize < previewX || baseX > previewX + thumbsVisibleW) continue;
 
-                if (mouseRelX >= baseX && mouseRelX <= baseX + thumbSize && mouseRelY >= thumbY && mouseRelY <= thumbY + thumbSize) {
-                    newHoverIndex = i;
+                boolean hitByAbs = (absMouseX >= baseX && absMouseX <= baseX + thumbSize && absMouseY >= thumbY && absMouseY <= thumbY + thumbSize);
+                boolean hitByRaw = (rawMouseX >= baseX && rawMouseX <= baseX + thumbSize && rawMouseY >= thumbY && rawMouseY <= thumbY + thumbSize);
+                if (hitByAbs || hitByRaw) {
+                     newHoverIndex = i;
                 }
-            }
+             }
 
-            if (newHoverIndex != hoverIndex) {
-                hoverIndex = newHoverIndex;
-                hoverAlpha = 0f;
-            }
-            if (hoverIndex != -1) hoverAlpha = Math.min(1f, hoverAlpha + 0.14f); else hoverAlpha = Math.max(0f, hoverAlpha - 0.14f);
+             if (newHoverIndex != hoverIndex) {
+                 hoverIndex = newHoverIndex;
+                 hoverAlpha = 0f;
+             }
+             if (hoverIndex != -1) hoverAlpha = Math.min(1f, hoverAlpha + 0.14f); else hoverAlpha = Math.max(0f, hoverAlpha - 0.14f);
 
-            for (int i = 0; i < wallpaperList.size(); i++) {
-                int baseX = previewX + 4 + i * (thumbSize + thumbPad) - Math.round(thumbOffset);
-                if (baseX + thumbSize < previewX || baseX > previewX + thumbsVisibleW) continue;
-                String name = wallpaperList.get(i);
+             for (int i = 0; i < wallpaperList.size(); i++) {
+                 int baseX = previewX + 4 + i * (thumbSize + thumbPad) - Math.round(thumbOffset);
+                 if (baseX + thumbSize < previewX || baseX > previewX + thumbsVisibleW) continue;
+                 String name = wallpaperList.get(i);
 
-                float hoverProgress = (i == hoverIndex) ? hoverAlpha : 0f;
-                float scale = 1.0f + 0.12f * hoverProgress;
-                int scaledSize = Math.round(thumbSize * scale);
-                int centerX = baseX + thumbSize / 2;
-                int drawX = centerX - scaledSize / 2;
-                int drawY = thumbY + (thumbSize - scaledSize) / 2;
+                 float hoverProgress = (i == hoverIndex) ? hoverAlpha : 0f;
+                 float scale = 1.0f + 0.12f * hoverProgress;
+                 int scaledSize = Math.round(thumbSize * scale);
+                 int centerX = baseX + thumbSize / 2;
+                 int drawX = centerX - scaledSize / 2;
+                 int drawY = thumbY + (thumbSize - scaledSize) / 2;
 
-                guiGraphics.fill(drawX - 2, drawY - 2, drawX + scaledSize + 2, drawY + scaledSize + 2, DraggableWindow.darkTheme ? 0xFF111111 : 0xFFDDDDDD);
+                 guiGraphics.fill(drawX - 2, drawY - 2, drawX + scaledSize + 2, drawY + scaledSize + 2, DraggableWindow.darkTheme ? 0xFF111111 : 0xFFDDDDDD);
+
+                boolean hoveredNow = (absMouseX >= baseX && absMouseX <= baseX + thumbSize && absMouseY >= thumbY && absMouseY <= thumbY + thumbSize)
+                        || (rawMouseX >= baseX && rawMouseX <= baseX + thumbSize && rawMouseY >= thumbY && rawMouseY <= thumbY + thumbSize);
+                if (hoveredNow) hoverProgress = Math.max(hoverProgress, 1.0f);
 
                 ResourceLocation thumb = FilesManager.getInstance().getWallpaperPreviewResource(name);
                 if (thumb != null) {
@@ -369,9 +372,7 @@ public class SettingsApp implements IApp {
         }
 
         guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Accent Color:"), mainX + 8, cy + 36, DraggableWindow.textPrimaryColor(), false);
-        accentColorInput.setX(mainX + 8);
-        accentColorInput.setY(cy + 56);
-        accentColorInput.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("Coming soon"), mainX + 8, cy + 60, DraggableWindow.textSecondaryColor(), false);
 
     }
 
@@ -483,9 +484,6 @@ public class SettingsApp implements IApp {
             return false;
         }
 
-        int[] rr = window.getRenderRect(26); int mainCX = rr[0]+8 + 140 + 12; int aiX = mainCX + 8, aiY = rr[1]+32 + 36, aiW = 80, aiH = 16;
-        if (mouseRelX >= aiX && mouseRelX <= aiX+aiW && mouseRelY >= aiY && mouseRelY <= aiY+aiH) { accentInputFocused = true; return true; }
-        accentInputFocused = false;
         return false;
     }
 
@@ -505,8 +503,8 @@ public class SettingsApp implements IApp {
         return false;
     }
 
-    @Override public boolean charTyped(DraggableWindow window, char codePoint, int modifiers) { if (accentInputFocused) { boolean r = accentColorInput.charTyped(codePoint, modifiers); if (r) { try{ String hex = accentColorInput.getValue().replace("#",""); if (hex.length()==6) { DraggableWindow.accentColorARGB = 0xFF000000 | Integer.parseInt(hex,16); SETTINGS.put("accentColor", String.format("#%06X", DraggableWindow.accentColorARGB & 0xFFFFFF)); saveSettingsAsync(); } } catch (NumberFormatException ignored) {} } return r; } return false; }
-    @Override public boolean keyPressed(DraggableWindow window, int keyCode, int scanCode, int modifiers) { if (accentInputFocused) return accentColorInput.keyPressed(keyCode, scanCode, modifiers); return false; }
+    @Override public boolean charTyped(DraggableWindow window, char codePoint, int modifiers) { return false; }
+    @Override public boolean keyPressed(DraggableWindow window, int keyCode, int scanCode, int modifiers) { return false; }
     @Override public void mouseReleased(DraggableWindow window, double mouseRelX, double mouseRelY, int button) { draggingThumb = false; }
     @Override public boolean mouseDragged(DraggableWindow window, double mouseRelX, double mouseRelY, double dx, double dy) {
         if (draggingThumb) {

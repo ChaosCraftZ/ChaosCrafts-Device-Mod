@@ -307,44 +307,48 @@ public class MessengerApp implements IApp {
         int[] rect = getContentRect(window);
         int cx = rect[0], cy = rect[1], cw = rect[2], ch = rect[3];
 
+        int absMouseX = mouseRelX + Math.round(window.getDisplayX());
+        int absMouseY = mouseRelY + Math.round(window.getDisplayY());
+
         showRightPanel = cw >= 800;
         guiGraphics.fill(cx, cy, cx + cw, cy + ch, DraggableWindow.darkTheme ? 0xFF1F2B38 : 0xFFF0F0F0);
 
         switch (currentScreen) {
             case CHAT_LIST:
-                renderChatListView(guiGraphics, cx, cy, cw, ch, mouseRelX, mouseRelY);
+                renderChatListView(guiGraphics, cx, cy, cw, ch, absMouseX, absMouseY);
                 break;
             case CONVERSATION:
-                renderConversationView(guiGraphics, cx, cy, cw, ch, mouseRelX, mouseRelY);
+                renderConversationView(guiGraphics, cx, cy, cw, ch, absMouseX, absMouseY);
                 break;
             case CONTACTS:
-                renderContactsView(guiGraphics, cx, cy, cw, ch, mouseRelX, mouseRelY);
+                renderContactsView(guiGraphics, cx, cy, cw, ch, absMouseX, absMouseY);
                 break;
             case FRIEND_REQUESTS:
-                renderFriendRequestsView(guiGraphics, cx, cy, cw, ch, mouseRelX, mouseRelY);
+                renderFriendRequestsView(guiGraphics, cx, cy, cw, ch, absMouseX, absMouseY);
                 break;
             case PROFILE:
-                renderProfileView(guiGraphics, cx, cy, cw, ch, mouseRelX, mouseRelY);
+                renderProfileView(guiGraphics, cx, cy, cw, ch, absMouseX, absMouseY);
                 break;
             case GROUP_CREATION:
-                renderGroupCreationView(guiGraphics, cx, cy, cw, ch, mouseRelX, mouseRelY);
+                renderGroupCreationView(guiGraphics, cx, cy, cw, ch, absMouseX, absMouseY);
                 break;
             case ADD_TO_GROUP:
-                renderAddToGroupView(guiGraphics, cx, cy, cw, ch, mouseRelX, mouseRelY);
+                renderAddToGroupView(guiGraphics, cx, cy, cw, ch, absMouseX, absMouseY);
                 break;
             case GROUP_SETTINGS:
-                renderGroupSettingsView(guiGraphics, cx, cy, cw, ch, mouseRelX, mouseRelY);
+                renderGroupSettingsView(guiGraphics, cx, cy, cw, ch, absMouseX, absMouseY);
                 break;
         }
 
         if (chatContextMenu != null && currentScreen == Screen.CHAT_LIST) {
-            chatContextMenu.render(guiGraphics, mouseRelX, mouseRelY, partialTick);
+            chatContextMenu.render(guiGraphics, absMouseX, absMouseY, partialTick);
         }
     }
 
     private void renderChatListView(GuiGraphics guiGraphics, int cx, int cy, int cw, int ch, int mouseX, int mouseY) {
-        int leftWidth = showRightPanel ? Math.min(leftPanelWidth, Math.max(0, cw - rightPanelWidth)) : cw;
-        int rightWidth = showRightPanel ? Math.min(rightPanelWidth, Math.max(0, cw - leftWidth)) : 0;
+        boolean willShowRight = showRightPanel && currentConversationId != null && currentScreen != Screen.CHAT_LIST;
+        int leftWidth = willShowRight ? Math.min(leftPanelWidth, Math.max(0, cw - rightPanelWidth)) : cw;
+        int rightWidth = willShowRight ? Math.min(rightPanelWidth, Math.max(0, cw - leftWidth)) : 0;
 
         guiGraphics.fill(cx, cy, cx + leftWidth, cy + ch, DraggableWindow.darkTheme ? 0xFF2A3942 : 0xFFFFFFFF);
         renderHeader(guiGraphics, "Chats", cx, cy, leftWidth, mouseX, mouseY);
@@ -712,7 +716,6 @@ public class MessengerApp implements IApp {
                 continue;
             }
 
-            renderContactItem(guiGraphics, contact, cx + 16, contactY, cw - 32, 50, mouseX, mouseY);
             contactY += 55;
         }
 
@@ -1236,7 +1239,7 @@ public class MessengerApp implements IApp {
         int adjustedMouseY = actualMouseY + scrollOffset;
 
         boolean localShowRight = cw >= 800;
-        int leftWidth = localShowRight ? leftPanelWidth : cw;
+        int leftWidth = (localShowRight && currentConversationId != null && currentScreen != Screen.CHAT_LIST) ? leftPanelWidth : cw;
 
         if (currentScreen == Screen.CHAT_LIST) {
             if (handleInputFieldClick((int) mouseRelX, adjustedMouseY, cx, cy, leftWidth, ch)) {
@@ -1644,20 +1647,10 @@ public class MessengerApp implements IApp {
 
         int contactY = cy + 160 - contactsScrollOffset;
         for (MessengerNetworkManager.Contact contact : networkManager.getContacts()) {
-            if (isMouseOver(mouseX, mouseY, cx + cw - 116, contactY + 30, 80, 20)) {
-                currentConversationId = contact.playerId;
-                currentScreen = Screen.CONVERSATION;
-                return true;
-            }
-
-            if (isMouseOver(mouseX, mouseY, cx + 8, contactY + 5, 40, 40)) {
-                profileViewingId = contact.playerId;
-                currentScreen = Screen.PROFILE;
-                return true;
-            }
-
-            if (isMouseOver(mouseX, mouseY, cx + 16, contactY, cw - 32, 50)) {
-                return true;
+            if (contactY + 60 > cy + ch) break;
+            if (contactY < cy + 160) {
+                contactY += 55;
+                continue;
             }
 
             contactY += 55;
@@ -1785,7 +1778,14 @@ public class MessengerApp implements IApp {
             String display = value.isEmpty() ? "" : Minecraft.getInstance().font.plainSubstrByWidth(value, cw - 48);
             if (focused) {
                 boolean caretOn = (System.currentTimeMillis() / 500) % 2 == 0;
-                if (caretOn) display = display + "|";
+                if (caretOn) {
+                    String withCaret = display + "|";
+                    if (Minecraft.getInstance().font.width(withCaret) > cw - 48) {
+                        display = Minecraft.getInstance().font.plainSubstrByWidth(display, cw - 52) + "|";
+                    } else {
+                        display = withCaret;
+                    }
+                }
             }
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(display), cx + 24, cy + ch - 146, 0xFFFFFFFF, false);
         }
@@ -2032,14 +2032,7 @@ public class MessengerApp implements IApp {
             String display = nameValue.isEmpty() ? "" : Minecraft.getInstance().font.plainSubstrByWidth(nameValue, cw - 48);
             if (nameFocused) {
                 boolean caretOn = (System.currentTimeMillis() / 500) % 2 == 0;
-                if (caretOn) {
-                    String withCaret = display + "|";
-                    if (Minecraft.getInstance().font.width(withCaret) > cw - 48) {
-                        display = Minecraft.getInstance().font.plainSubstrByWidth(display, cw - 52) + "|";
-                    } else {
-                        display = withCaret;
-                    }
-                }
+                if (caretOn) display = display + "|";
             }
             guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(display), cx + 24, infoY + 24, 0xFFFFFFFF, false);
         }

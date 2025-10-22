@@ -8,6 +8,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import net.chaoscraft.chaoscrafts_device_mod.client.app.messenger.MessengerApp;
+import net.chaoscraft.chaoscrafts_device_mod.ConfigHandler;
 
 public final class AppFactory {
     private static final Map<String, Integer> BUILT_IN_NAME_TO_ID = Map.ofEntries(
@@ -84,11 +85,20 @@ public final class AppFactory {
     }
 
     public static List<String> getDefaultApps() {
-        return List.of(
+        List<String> base = List.of(
                 "browser", "calculator", "paint", "files", "settings",
                 "youtube", "geometry dash", "home security", "marketplace",
                 "notepad", "video player", "audio player", "messenger"
         );
+
+        if (ConfigHandler.experimentalAppsEnabled()) return base;
+
+        return base.stream()
+                .filter(s -> {
+                    String k = s.toLowerCase();
+                    return !k.equals("youtube") && !k.equals("browser") && !k.equals("calendar") && !k.equals("home security");
+                })
+                .collect(Collectors.toUnmodifiableList());
     }
 
     public static Map<String, Integer> getRegisteredNameToIdSnapshot() {

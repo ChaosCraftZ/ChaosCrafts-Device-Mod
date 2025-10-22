@@ -22,6 +22,7 @@ import net.chaoscraft.chaoscrafts_device_mod.ConfigHandler;
 /**
  * Fullscreen Windows-style lock/login screen.
  * Avatars are drawn as true circles with perfectly smooth white outlines.
+ * I know that it was completely unnecessary to go to this much effort just to draw a circle,
  */
 public class RiftLoginScreen extends Screen {
     private final Screen previous;
@@ -102,7 +103,8 @@ public class RiftLoginScreen extends Screen {
             closingProgress = Math.min(1f, closingProgress + CLOSING_SPEED);
             if (closingProgress >= 1f) {
                 try {
-                    Minecraft.getInstance().setScreen(previous);
+                    if (previous != null) Minecraft.getInstance().setScreen(previous);
+                    else Minecraft.getInstance().setScreen(new DesktopScreen());
                 } catch (Exception ignored) {}
                 return;
             }
@@ -467,32 +469,6 @@ public class RiftLoginScreen extends Screen {
             gui.drawString(font, Component.literal(dn), scaledNameX, scaledNameY, 0xFFFFFFFF, false);
             gui.pose().popPose();
 
-            String[] iconGlyphs = new String[] {"⚙", "⏻", "☰"};
-            int iconsCount = iconGlyphs.length;
-            int radiusBtn = 16;
-            int spacing = 8;
-            int totalWidth = iconsCount * (radiusBtn * 2) + (iconsCount - 1) * spacing;
-            int startX = width - totalWidth - 12;
-            int centerYIcons = height - 28;
-
-            if (transition < 0.2f) {
-                for (int i = 0; i < iconsCount; i++) {
-                    int cxBtn = startX + radiusBtn + i * (2 * radiusBtn + spacing);
-                    int cyBtn = centerYIcons;
-
-                    boolean hover = (sMouseX - cxBtn) * (sMouseX - cxBtn) + (sMouseY - cyBtn) * (sMouseY - cyBtn) <= radiusBtn * radiusBtn;
-
-                    int bgCol = hover ? 0x66FFFFFF : 0x33FFFFFF;
-                    filledCircleUI(gui, cxBtn, cyBtn, radiusBtn, bgCol);
-
-                    String glyph = iconGlyphs[i];
-                    int glyphW = font.width(glyph);
-                    int glyphX = cxBtn - glyphW / 2;
-                    int glyphY = cyBtn - font.lineHeight / 2;
-                    int glyphCol = hover ? 0xFF000000 : 0xFFFFFFFF;
-                    gui.drawString(font, Component.literal(glyph), glyphX, glyphY, glyphCol, false);
-                }
-            }
 
             if (Minecraft.getInstance().options.renderDebug) {
                 drawString(gui, font, "Avatar Res: " + avatarResolution + " (Press +/- to change)", 10, 10, 0xFFFFFFFF);

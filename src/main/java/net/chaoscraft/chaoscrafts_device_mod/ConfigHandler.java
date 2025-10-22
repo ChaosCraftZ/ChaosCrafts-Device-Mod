@@ -17,6 +17,7 @@ public final class ConfigHandler {
 
     public static class Client {
         public final ForgeConfigSpec.BooleanValue experimentalSettings;
+        public final ForgeConfigSpec.BooleanValue experimentalApps;
         public final ForgeConfigSpec.IntValue uiScalePercent;
         public final ForgeConfigSpec.IntValue uiScaleGui1;
         public final ForgeConfigSpec.IntValue uiScaleGui2;
@@ -29,6 +30,10 @@ public final class ConfigHandler {
             experimentalSettings = b
                     .comment("Enable experimental client features. When false the laptop fan sound is force-muted.")
                     .define("experimentalSettings", false);
+
+            experimentalApps = b
+                    .comment("Enable experimental apps (YouTube, Browser, Calendar). When false these apps are hidden from the desktop and the Calendar entry is hidden from the marketplace.")
+                    .define("experimentalApps", false);
 
             uiScalePercent = b
                     .comment("UI scale percent for the mod's UI (1-200). 100 is the default (no change). Values below 100 shrink the UI, above 100 enlarge it.")
@@ -59,6 +64,10 @@ public final class ConfigHandler {
 
     public static boolean experimentalEnabled() {
         return CLIENT.experimentalSettings.get();
+    }
+
+    public static boolean experimentalAppsEnabled() {
+        return CLIENT.experimentalApps.get();
     }
 
     public static int uiScalePercent() {

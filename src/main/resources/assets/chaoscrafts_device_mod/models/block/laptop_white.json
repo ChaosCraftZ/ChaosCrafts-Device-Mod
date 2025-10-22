@@ -2,7 +2,7 @@
   "parent": "chaoscrafts_device_mod:block/laptop",
   "textures": {
     "layer0": "chaoscrafts_device_mod:block/laptop_uv_white",
-    "particle": "chaoscrafts_device_mod:block/laptop_uv_white"
+    "particle": "chaoscrafts_device_mod:block/laptop_particle_white"
   }
 }
 

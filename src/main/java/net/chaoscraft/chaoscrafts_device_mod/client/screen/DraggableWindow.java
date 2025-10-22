@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.chaoscraft.chaoscrafts_device_mod.client.app.IApp;
+import net.minecraft.resources.ResourceLocation;
 
 import net.chaoscraft.chaoscrafts_device_mod.client.async.AsyncTaskManager;
 import net.chaoscraft.chaoscrafts_device_mod.ConfigHandler;
@@ -14,6 +15,10 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class DraggableWindow {
+    private static final ResourceLocation BTN_CLOSE = ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/buttons/close_button.png");
+    private static final ResourceLocation BTN_FULL = ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/buttons/fullscreen_button.png");
+    private static final ResourceLocation BTN_MIN = ResourceLocation.fromNamespaceAndPath("chaoscrafts_device_mod", "textures/gui/buttons/minimize_button.png");
+
     public int x, y, width, height;
     public boolean dragging = false;
     public boolean minimized = false;
@@ -26,11 +31,21 @@ public class DraggableWindow {
     public String appName;
     public IApp app;
 
-    private float displayX, displayY;
+    float displayX;
+    float displayY;
     private float opacity = 1f, targetOpacity = 1f;
     private int dragOffsetX, dragOffsetY;
 
+    private int savedX = 0, savedY = 0, savedWidth = 0, savedHeight = 0;
+    private boolean savedMaximized = false;
+    private boolean savedDragging = false;
+    private boolean savedStateExists = false;
+
+    private boolean prevExclusiveFullscreen = false;
+
     public int previewX = 0, previewY = 0, previewW = 0, previewH = 0;
+
+    public float previewDisplayX = 0f, previewDisplayY = 0f, previewDisplayW = 0f, previewDisplayH = 0f;
 
     public float previewOpacity = 0f;
     public float previewTargetOpacity = 0f;
@@ -78,6 +93,39 @@ public class DraggableWindow {
 
     private static float lerp(float a, float b, float f) { return a + (b - a) * f; }
 
+    public static int lightenRgb(int rgb, float amount) {
+        int r = (rgb >> 16) & 0xFF;
+        int g = (rgb >> 8) & 0xFF;
+        int b = rgb & 0xFF;
+        int nr = Math.min(255, (int) (r + (255 - r) * amount));
+        int ng = Math.min(255, (int) (g + (255 - g) * amount));
+        int nb = Math.min(255, (int) (b + (255 - b) * amount));
+        return (nr << 16) | (ng << 8) | nb;
+    }
+
+    public static int darkenRgb(int rgb, float amount) {
+        int r = (rgb >> 16) & 0xFF;
+        int g = (rgb >> 8) & 0xFF;
+        int b = rgb & 0xFF;
+        int nr = Math.max(0, (int) (r * (1f - amount)));
+        int ng = Math.max(0, (int) (g * (1f - amount)));
+        int nb = Math.max(0, (int) (b * (1f - amount)));
+        return (nr << 16) | (ng << 8) | nb;
+    }
+
+    private static String formatTitleName(String name) {
+        if (name == null || name.isEmpty()) return "";
+        String base = name;
+        if (base.toLowerCase(java.util.Locale.ROOT).endsWith(".txt")) base = base.substring(0, base.length() - 4);
+        StringBuilder sb = new StringBuilder();
+        boolean capNext = true;
+        for (char c : base.toCharArray()) {
+            if (Character.isWhitespace(c) || c == '_' || c == '-') { sb.append(c); capNext = true; continue; }
+            if (capNext) { sb.append(Character.toUpperCase(c)); capNext = false; } else sb.append(Character.toLowerCase(c));
+        }
+        return sb.toString();
+    }
+
     public void render(GuiGraphics guiGraphics, PoseStack poseStack, int mouseX, int mouseY, boolean focused, int taskbarHeight, float partialTick) {
         if (!dragging) {
             displayX = lerp(displayX, x, 0.18f);
@@ -87,6 +135,26 @@ public class DraggableWindow {
             displayY = y;
         }
         opacity = lerp(opacity, targetOpacity, 0.18f);
+
+        if (exclusiveFullscreen && !prevExclusiveFullscreen) {
+            savedX = this.x; savedY = this.y; savedWidth = this.width; savedHeight = this.height;
+            savedMaximized = this.maximized;
+            savedDragging = this.dragging;
+            savedStateExists = true;
+
+            this.x = 0; this.y = 0;
+            this.displayX = 0f; this.displayY = 0f;
+            this.dragging = false;
+        } else if (!exclusiveFullscreen && prevExclusiveFullscreen) {
+            if (savedStateExists) {
+                this.x = savedX; this.y = savedY; this.width = savedWidth; this.height = savedHeight;
+                this.maximized = savedMaximized;
+                this.dragging = savedDragging;
+                this.displayX = this.x; this.displayY = this.y;
+                savedStateExists = false;
+            }
+        }
+        prevExclusiveFullscreen = exclusiveFullscreen;
 
         if (closing && opacity < 0.03f) { removeRequested = true; return; }
 
@@ -123,27 +191,69 @@ public class DraggableWindow {
         }
 
         guiGraphics.fill(renderX, renderY, renderX + renderW, renderY + renderH, bgColor);
-        guiGraphics.fill(renderX, renderY, renderX + renderW, renderY + 26, titleColor);
+
+        int titleH = 26;
+        int topH = Math.max(1, Math.round(titleH * 0.12f));
+        int bottomH = Math.max(1, Math.round(titleH * 0.12f));
+        int middleH = Math.max(0, titleH - topH - bottomH);
+
+        int accentRgb = accentColorARGB & 0x00FFFFFF;
+        int lighterRgb = lightenRgb(accentRgb, 0.12f);
+        int darkerRgb = darkenRgb(accentRgb, 0.12f);
+
+        int titleAlpha = (titleColor >>> 24) & 0xFF;
+        int lighterColor = (titleAlpha << 24) | (lighterRgb & 0x00FFFFFF);
+        int normalColor = (titleAlpha << 24) | (accentRgb & 0x00FFFFFF);
+        int darkerColor = (titleAlpha << 24) | (darkerRgb & 0x00FFFFFF);
+
+        guiGraphics.fill(renderX, renderY, renderX + renderW, renderY + topH, lighterColor);
+        guiGraphics.fill(renderX, renderY + topH, renderX + renderW, renderY + topH + middleH, normalColor);
+        guiGraphics.fill(renderX, renderY + topH + middleH, renderX + renderW, renderY + titleH, darkerColor);
 
         int textColor = contrastingColorFor(accentColorARGB);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(appName), renderX + 8, renderY + 6, textColor, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(formatTitleName(appName)), renderX + 8, renderY + 6, textColor, false);
 
         int btnY = renderY + 6;
 
-        guiGraphics.fill(renderX + renderW - 20, btnY, renderX + renderW - 8, btnY + 14, 0xFFFF6666 | ((alpha << 24) & 0xFF000000));
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("X"), renderX + renderW - 19, btnY, contrastingColorFor(0xFFFF6666), false);
+        int btnW = 12; int btnH = 14;
+        int closeX = renderX + renderW - 20; int closeY = btnY;
+        int minX = renderX + renderW - 44; int minY = btnY;
+        int fullX = renderX + renderW - 68; int fullY = btnY;
 
-        guiGraphics.fill(renderX + renderW - 44, btnY, renderX + renderW - 32, btnY + 14, 0xFFFFFF66 | ((alpha << 24) & 0xFF000000));
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("-"), renderX + renderW - 43, btnY, contrastingColorFor(0xFFFFFF66), false);
+        int iconSize = Math.min(16, Math.max(8, btnH - 2));
 
-        int accent = accentColorARGB & 0x00FFFFFF;
-        int accentWithAlpha = ((alpha << 24) | (accent & 0x00FFFFFF));
-        guiGraphics.fill(renderX + renderW - 68, btnY, renderX + renderW - 56, btnY + 14, accentWithAlpha);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("▢"), renderX + renderW - 65, btnY, contrastingColorFor(accentWithAlpha), false);
+        try {
+            int ix = closeX + (btnW - iconSize) / 2;
+            int iy = closeY + (btnH - iconSize) / 2;
+            guiGraphics.blit(BTN_CLOSE, ix, iy, iconSize, iconSize, 0, 0, 16, 16, 16, 16);
+        } catch (Exception e) {
+            guiGraphics.fill(closeX, closeY, closeX + btnW, closeY + btnH, 0xFFFF6666 | ((alpha << 24) & 0xFF000000));
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("X"), closeX + 1, closeY, contrastingColorFor(0xFFFF6666), false);
+        }
 
-        DebugOverlay.drawHitbox(guiGraphics, renderX + renderW - 20, btnY, renderX + renderW - 8, btnY + 14, "btn:close");
-        DebugOverlay.drawHitbox(guiGraphics, renderX + renderW - 44, btnY, renderX + renderW - 32, btnY + 14, "btn:minimize");
-        DebugOverlay.drawHitbox(guiGraphics, renderX + renderW - 68, btnY, renderX + renderW - 56, btnY + 14, "btn:maximize");
+        try {
+            int ix = minX + (btnW - iconSize) / 2;
+            int iy = minY + (btnH - iconSize) / 2;
+            guiGraphics.blit(BTN_MIN, ix, iy, iconSize, iconSize, 0, 0, 16, 16, 16, 16);
+        } catch (Exception e) {
+            guiGraphics.fill(minX, minY, minX + btnW, minY + btnH, 0xFFFFFF66 | ((alpha << 24) & 0xFF000000));
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("-"), minX + 1, minY, contrastingColorFor(0xFFFFFF66), false);
+        }
+
+        try {
+            int ix = fullX + (btnW - iconSize) / 2;
+            int iy = fullY + (btnH - iconSize) / 2;
+            guiGraphics.blit(BTN_FULL, ix, iy, iconSize, iconSize, 0, 0, 16, 16, 16, 16);
+        } catch (Exception e) {
+            int accent = accentColorARGB & 0x00FFFFFF;
+            int accentWithAlpha = ((alpha << 24) | (accent & 0x00FFFFFF));
+            guiGraphics.fill(fullX, fullY, fullX + btnW, fullY + btnH, accentWithAlpha);
+            guiGraphics.drawString(Minecraft.getInstance().font, Component.literal("▢"), fullX + 3, fullY, contrastingColorFor(accentWithAlpha), false);
+        }
+
+         DebugOverlay.drawHitbox(guiGraphics, renderX + renderW - 20, btnY, renderX + renderW - 8, btnY + 14, "btn:close");
+         DebugOverlay.drawHitbox(guiGraphics, renderX + renderW - 44, btnY, renderX + renderW - 32, btnY + 14, "btn:minimize");
+         DebugOverlay.drawHitbox(guiGraphics, renderX + renderW - 68, btnY, renderX + renderW - 56, btnY + 14, "btn:maximize");
 
         if (app != null && !minimized) {
             try {
@@ -187,18 +297,37 @@ public class DraggableWindow {
 
     public void drawPreview(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         if (!preview || previewW <= 0 || previewH <= 0 || previewOpacity <= 0.02f) return;
-        int px = previewX, py = previewY, pw = previewW, ph = previewH;
-        int alpha = Math.round(255 * previewOpacity) & 0xFF;
-        int shadowAlpha = Math.round(alpha * 0.25f);
-        guiGraphics.fill(px - 4, py - 4, px + pw + 4, py + ph + 4, (shadowAlpha << 24) | 0x000000);
-        int bgBase = darkTheme ? 0x222222 : 0xFFFFFFFF;
-        int bgColor = ((alpha << 24) | (bgBase & 0x00FFFFFF));
-        guiGraphics.fill(px, py, px + pw, py + ph, bgColor);
-        int titleColor = ((alpha << 24) | (accentColorARGB & 0x00FFFFFF));
+        int px = Math.round(previewDisplayX);
+        int py = Math.round(previewDisplayY);
+        int pw = Math.round(previewDisplayW);
+        int ph = Math.round(previewDisplayH);
+         int alpha = Math.round(255 * previewOpacity) & 0xFF;
+         int shadowAlpha = Math.round(alpha * 0.25f);
+         guiGraphics.fill(px - 4, py - 4, px + pw + 4, py + ph + 4, (shadowAlpha << 24) | 0x000000);
+         int bgBase = darkTheme ? 0x222222 : 0xFFFFFFFF;
+         int bgColor = ((alpha << 24) | (bgBase & 0x00FFFFFF));
+         guiGraphics.fill(px, py, px + pw, py + ph, bgColor);
+
         int titleH = Math.max(18, (int)(pw * 0.12f));
-        guiGraphics.fill(px, py, px + pw, py + titleH, titleColor);
+        int topH = Math.max(1, Math.round(titleH * 0.12f));
+        int bottomH = Math.max(1, Math.round(titleH * 0.12f));
+        int middleH = Math.max(0, titleH - topH - bottomH);
+
+        int accentRgb = accentColorARGB & 0x00FFFFFF;
+        int lighterRgb = lightenRgb(accentRgb, 0.12f);
+        int darkerRgb = darkenRgb(accentRgb, 0.12f);
+
+        int titleAlpha = alpha;
+        int lighterColor = (titleAlpha << 24) | (lighterRgb & 0x00FFFFFF);
+        int normalColor = (titleAlpha << 24) | (accentRgb & 0x00FFFFFF);
+        int darkerColor = (titleAlpha << 24) | (darkerRgb & 0x00FFFFFF);
+
+        guiGraphics.fill(px, py, px + pw, py + topH, lighterColor);
+        guiGraphics.fill(px, py + topH, px + pw, py + topH + middleH, normalColor);
+        guiGraphics.fill(px, py + topH + middleH, px + pw, py + titleH, darkerColor);
+
         int textColor = contrastingColorFor(accentColorARGB);
-        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(appName), px + 6, py + 4, textColor, false);
+        guiGraphics.drawString(Minecraft.getInstance().font, Component.literal(formatTitleName(appName)), px + 6, py + 4, textColor, false);
 
         int innerTop = py + titleH + 4;
         int innerLeft = px + 4;
@@ -291,8 +420,9 @@ public class DraggableWindow {
         }
 
         if (mx >= renderX + renderW - 68 && mx < renderX + renderW - 56 && my >= renderY + 6 && my < renderY + 20) {
-            maximized = !maximized;
-            if (maximized) { x = 0; y = 0; }
+            boolean wantMaximized = !this.maximized;
+            setMaximized(wantMaximized, taskbarHeight);
+            if (wantMaximized) { exclusiveFullscreen = false; x = 0; y = 0; }
             dragging = false;
             return true;
         }
@@ -378,9 +508,16 @@ public class DraggableWindow {
 
     public void updatePreviewAnimation(float partialTick) {
         previewOpacity = previewOpacity + (previewTargetOpacity - previewOpacity) * 0.25f;
+
+        previewDisplayX = previewDisplayX + (previewX - previewDisplayX) * 0.25f;
+        previewDisplayY = previewDisplayY + (previewY - previewDisplayY) * 0.25f;
+        previewDisplayW = previewDisplayW + (previewW - previewDisplayW) * 0.25f;
+        previewDisplayH = previewDisplayH + (previewH - previewDisplayH) * 0.25f;
+
         if (previewTargetOpacity <= 0f && previewOpacity < 0.02f) {
             preview = false;
             previewW = previewH = 0;
+            previewDisplayW = previewDisplayH = 0f;
         }
     }
 
@@ -406,5 +543,64 @@ public class DraggableWindow {
         if (exclusiveFullscreen) return new int[]{0, 0, fullW, fullH};
         if (maximized) return new int[]{0, 0, fullW, Math.max(0, fullH - taskbarHeight)};
         return new int[]{Math.round(displayX), Math.round(displayY), width, height};
+    }
+
+    public void setExclusiveFullscreen(boolean enabled) {
+        if (this.exclusiveFullscreen == enabled) return;
+        if (enabled) {
+            savedX = this.x; savedY = this.y; savedWidth = this.width; savedHeight = this.height;
+            savedMaximized = this.maximized;
+            savedDragging = this.dragging;
+            savedStateExists = true;
+
+            this.exclusiveFullscreen = true;
+            this.x = 0; this.y = 0;
+            this.displayX = 0f; this.displayY = 0f;
+            this.dragging = false;
+        } else {
+            this.exclusiveFullscreen = false;
+            if (savedStateExists) {
+                this.x = savedX; this.y = savedY; this.width = savedWidth; this.height = savedHeight;
+                this.maximized = savedMaximized;
+                this.dragging = savedDragging;
+                this.displayX = this.x; this.displayY = this.y;
+                savedStateExists = false;
+            }
+        }
+        prevExclusiveFullscreen = this.exclusiveFullscreen;
+    }
+
+    public void setMaximized(boolean enabled, int taskbarHeight) {
+        if (this.maximized == enabled) return;
+        if (enabled) {
+            savedX = this.x; savedY = this.y; savedWidth = this.width; savedHeight = this.height;
+            savedMaximized = this.maximized;
+            savedDragging = this.dragging;
+            savedStateExists = true;
+
+            float uiScale = ConfigHandler.uiScaleFactor();
+            int fullW = Math.round(Minecraft.getInstance().getWindow().getGuiScaledWidth() / uiScale);
+            int fullH = Math.round(Minecraft.getInstance().getWindow().getGuiScaledHeight() / uiScale);
+
+            this.maximized = true;
+            this.x = 0; this.y = 0;
+            this.width = fullW;
+            this.height = Math.max(0, fullH - taskbarHeight);
+            this.displayX = 0f; this.displayY = 0f;
+            this.dragging = false;
+        } else {
+            this.maximized = false;
+            if (savedStateExists) {
+                this.x = savedX; this.y = savedY; this.width = savedWidth; this.height = savedHeight;
+                this.maximized = savedMaximized;
+                this.dragging = savedDragging;
+                this.displayX = this.x; this.displayY = this.y;
+                savedStateExists = false;
+            }
+        }
+    }
+
+    public boolean isExclusiveFullscreen() {
+        return this.exclusiveFullscreen;
     }
 }

@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.chaoscraft.chaoscrafts_device_mod.client.app.AppFactory;
 import net.chaoscraft.chaoscrafts_device_mod.client.app.AppRegistry;
+import net.chaoscraft.chaoscrafts_device_mod.ConfigHandler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
@@ -16,6 +17,7 @@ import javax.imageio.stream.ImageInputStream;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.w3c.dom.Node;
 import org.w3c.dom.NamedNodeMap;
 
@@ -29,7 +31,7 @@ public class FilesManager {
     private final Map<String, ResourceLocation> wallpaperPreviews = new HashMap<>();
 
     private final Map<String, FSNode> fileSystem = new HashMap<>();
-    private final List<DesktopIconState> desktopIcons = new ArrayList<>();
+    private final CopyOnWriteArrayList<DesktopIconState> desktopIcons = new CopyOnWriteArrayList<>();
 
     private DynamicTexture currentWallpaperTexture = null;
     private ResourceLocation currentWallpaperRL = null;
@@ -122,6 +124,13 @@ public class FilesManager {
                     this.currentWallpaperColor = state.wallpaperColor != 0 ? state.wallpaperColor : this.currentWallpaperColor;
                     if (this.currentWallpaperIsColor) {
                         clearCurrentWallpaperTexture();
+                    }
+
+                    if (!ConfigHandler.experimentalAppsEnabled()) {
+                        desktopIcons.removeIf(icon -> {
+                            String n = icon.name == null ? "" : icon.name.toLowerCase(Locale.ROOT).trim();
+                            return n.equals("youtube") || n.equals("browser") || n.equals("calendar") || n.equals("home security");
+                        });
                     }
                 }
             } catch (Exception e) {
@@ -747,6 +756,11 @@ public class FilesManager {
         AppRegistry registry = AppRegistry.getInstance();
         for (String appName : registry.getDesktopApps()) {
             if (registry.isInstalled(appName)) {
+                if (!ConfigHandler.experimentalAppsEnabled()) {
+                    String n = appName == null ? "" : appName.toLowerCase(Locale.ROOT).trim();
+                    if (n.equals("youtube") || n.equals("browser") || n.equals("calendar") || n.equals("home security")) continue;
+                }
+
                 addDesktopIcon(appName,
                         (int) (Math.random() * 300) + 100,
                         (int) (Math.random() * 300) + 60);

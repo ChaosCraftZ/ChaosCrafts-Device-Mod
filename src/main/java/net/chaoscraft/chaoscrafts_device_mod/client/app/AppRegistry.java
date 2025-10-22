@@ -5,6 +5,9 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import net.chaoscraft.chaoscrafts_device_mod.client.async.AsyncTaskManager;
 import net.chaoscraft.chaoscrafts_device_mod.client.fs.FilesManager;
+import net.chaoscraft.chaoscrafts_device_mod.ConfigHandler;
+import net.chaoscraft.chaoscrafts_device_mod.client.screen.DesktopScreen;
+import net.minecraft.client.Minecraft;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -32,9 +35,17 @@ public class AppRegistry {
     private final Set<String> installedApps = ConcurrentHashMap.newKeySet();
     private final Set<String> desktopApps = ConcurrentHashMap.newKeySet();
 
-    private static final Set<String> DEFAULT_APPS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
-            "browser", "calculator", "paint", "files", "settings", "youtube", "notepad", "marketplace"
-    )));
+    private static Set<String> getDefaultApps() {
+        Set<String> base = new HashSet<>(Arrays.asList(
+                "browser", "calculator", "paint", "files", "settings", "youtube", "notepad", "marketplace"
+        ));
+        if (!ConfigHandler.experimentalAppsEnabled()) {
+            base.remove("youtube");
+            base.remove("browser");
+            base.remove("home security");
+        }
+        return Collections.unmodifiableSet(base);
+    }
 
     private final AsyncTaskManager asyncManager = AsyncTaskManager.getInstance();
     private final CompletableFuture<Void> loadFuture;
@@ -103,12 +114,20 @@ public class AppRegistry {
     }
 
     public List<AppInfo> getAllApps() {
-        return new ArrayList<>(allApps.values());
+        List<AppInfo> apps = new ArrayList<>(allApps.values());
+        if (!ConfigHandler.experimentalAppsEnabled()) {
+            apps.removeIf(a -> {
+                if (a == null || a.internalName == null) return false;
+                String n = a.internalName.toLowerCase(Locale.ROOT).trim();
+                return n.equals("calendar") || n.equals("calender") || n.equals("youtube") || n.equals("browser") || n.equals("home security");
+            });
+        }
+        return apps;
     }
 
     public boolean isDefaultApp(String appName) {
         if (appName == null) return false;
-        return DEFAULT_APPS.contains(normalize(appName));
+        return getDefaultApps().contains(normalize(appName));
     }
 
     public boolean isInstalled(String appName) {
@@ -186,7 +205,7 @@ public class AppRegistry {
 
             loadInstallationStatus();
 
-            for (String d : DEFAULT_APPS) {
+            for (String d : getDefaultApps()) {
                 allApps.computeIfAbsent(d, k -> {
                     String display = capitalizeEachWord(k);
                     return new AppInfo(k, display, "Default application", "1.0");
@@ -197,11 +216,13 @@ public class AppRegistry {
 
             Map<String, String> marketplace = new LinkedHashMap<>();
             marketplace.put("geometry dash", "A fun rhythm-based platformer");
-            marketplace.put("home security", "Monitor your home security system");
+            if (ConfigHandler.experimentalAppsEnabled()) {
+                marketplace.put("home security", "Monitor your home security system");
+                marketplace.put("calendar", "Manage your events and schedule");
+            }
             marketplace.put("audio player", "Play your favorite music files");
             marketplace.put("video player", "Watch video files");
             marketplace.put("notes", "A simple note taking application");
-            marketplace.put("calendar", "Manage your events and schedule");
             marketplace.put("weather", "Check the current weather and forecast");
 
             for (Map.Entry<String, String> e : marketplace.entrySet()) {
@@ -209,6 +230,14 @@ public class AppRegistry {
                 allApps.computeIfAbsent(internal, k -> {
                     return new AppInfo(k, capitalizeEachWord(k), e.getValue(), "1.0");
                 });
+            }
+
+            if (!ConfigHandler.experimentalAppsEnabled()) {
+                allApps.remove("calendar");
+                allApps.remove("calender");
+                allApps.remove("youtube");
+                allApps.remove("browser");
+                allApps.remove("home security");
             }
 
             saveRegistryAsync();
@@ -236,6 +265,18 @@ public class AppRegistry {
                 if (status.desktopApps != null) {
                     for (String s : status.desktopApps) desktopApps.add(normalize(s));
                 }
+            }
+
+            if (!ConfigHandler.experimentalAppsEnabled()) {
+                installedApps.remove("youtube");
+                installedApps.remove("browser");
+                installedApps.remove("calendar");
+                installedApps.remove("home security");
+
+                desktopApps.remove("youtube");
+                desktopApps.remove("browser");
+                desktopApps.remove("calendar");
+                desktopApps.remove("home security");
             }
         } catch (Exception e) {
             LOGGER.error("Failed to load installation status", e);
@@ -292,8 +333,8 @@ public class AppRegistry {
         try {
             asyncManager.executeOnMainThread(() -> {
                 try {
-                    if (net.minecraft.client.Minecraft.getInstance().screen instanceof net.chaoscraft.chaoscrafts_device_mod.client.screen.DesktopScreen) {
-                        ((net.chaoscraft.chaoscrafts_device_mod.client.screen.DesktopScreen) net.minecraft.client.Minecraft.getInstance().screen).refreshDesktopIcons();
+                    if (Minecraft.getInstance().screen instanceof DesktopScreen) {
+                        ((DesktopScreen) Minecraft.getInstance().screen).refreshDesktopIcons();
                     }
                 } catch (Exception ignored) {
                 }
