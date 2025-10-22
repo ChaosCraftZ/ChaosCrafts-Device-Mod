@@ -114,6 +114,13 @@ public class RiftLoginScreen extends Screen {
             showTile = false;
         }
 
+        // Ensure skin texture is loaded
+        if (skinRes != null) {
+            try {
+                Minecraft.getInstance().getTextureManager().bind(skinRes);
+            } catch (Exception ignored) {}
+        }
+
         try {
             if (skinRes != null) {
                 String largeKey = (skinRes == null ? "default" : skinRes.toString()) + "#" + profileIconSize + "#" + avatarResolution + "#1";
